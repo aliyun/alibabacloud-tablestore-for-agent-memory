@@ -36,30 +36,58 @@ class BaseMemoryStore(BaseModel, ABC):
 
     @abstractmethod
     def put_session(self, session: Session) -> None:
+        """
+        写入一条Session会话
+        :param session:  会话内容
+        """
         pass
 
     @abstractmethod
     def update_session(self, session: Session) -> None:
+        """
+        更新一条Session会话
+        :param session:  会话内容
+        """
         pass
 
     @abstractmethod
     def delete_session(self, user_id: str, session_id: str) -> None:
+        """
+        删除一条Session会话
+        :param user_id: 用户id
+        :param session_id: 会话id
+        """
         pass
 
     @abstractmethod
     def delete_sessions(self, user_id: str) -> None:
+        """
+        删除一个用户的所有Session会话
+        :param user_id: 用户id
+        """
         pass
 
     @abstractmethod
     def delete_all_sessions(self) -> None:
+        """
+        删除所有用户的所有Session会话（注意：高危）
+        """
         pass
 
     @abstractmethod
     def get_session(self, user_id: str, session_id: str) -> Optional[Session]:
+        """
+        查出一个会话的详细内容
+        :param user_id: 用户id
+        :param session_id: 会话id
+        """
         pass
 
     @abstractmethod
     def list_all_sessions(self) -> Iterator[Session]:
+        """
+        列出所有用户的所有会话。
+        """
         pass
 
     @abstractmethod
@@ -71,6 +99,13 @@ class BaseMemoryStore(BaseModel, ABC):
             batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
             max_count: Optional[int] = None,
     ) -> Iterator[Session]:
+        """
+        列出一个用户的所有会话。
+        :param user_id: 用户id，必传参数。
+        :param metadata_filter: metadata过滤条件。
+        :param batch_size: 内部批量获取参数。
+        :param max_count: Iterator中最大的个数。
+        """
         pass
 
     @abstractmethod

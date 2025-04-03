@@ -13,3 +13,15 @@
 - python >= 3.9
 - 项目管理工具：poetry
 
+## 打包
+
+```shell
+  poetry build
+```
+
+打包结果在当前目录`dist`下.
+
+别的项目本地安装该项目的引用:
+```shell
+ pip install ${真实目录}/dist/tablestore_for_agent_memory-${具体版本}-py3-none-any.whl
+```
