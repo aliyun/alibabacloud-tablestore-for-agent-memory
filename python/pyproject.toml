@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "tablestore-for-agent-memory"
+version = "0.1.0"
+description = "Tablestore for Agent Memory in AI Agent."
+authors = ["xunjian.sl <xunjian.sl@alibaba-inc.com>"]
+readme = "README.md"
+packages = [
+    { include = "tablestore_for_agent_memory", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+tablestore = "^6.1.0"
+pydantic = "^2.11.1"
+notebook = "^7.3.3"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+pytest-srcpaths = "^1.2.1"
+faker = "^37.1.0"
+black = "^25.1.0"
+autoflake = "^2.3.1"
+isort = "^6.0.1"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+target-version = ['py39']
+
+[tool.isort]
+profile = "black"
+known_third_party = ["tablestore_for_agent_memory.base.common"]

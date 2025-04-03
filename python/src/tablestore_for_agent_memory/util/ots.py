@@ -1,0 +1,349 @@
+import logging
+from collections.abc import Iterable, Iterator
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import six
+import tablestore
+from numpy.ma.core import count
+from tablestore import (
+    ComparatorType,
+    SecondaryIndexMeta,
+    SecondaryIndexType,
+    SingleColumnCondition,
+)
+
+from tablestore_for_agent_memory.base.common import MetaType, Order
+from tablestore_for_agent_memory.base.filter import (
+    AND,
+    GT,
+    GTE,
+    LT,
+    LTE,
+    NOT,
+    OR,
+    BaseConditionFilter,
+    BaseOperatorFilter,
+    Eq,
+    Filter,
+    NotEQ,
+)
+from tablestore_for_agent_memory.base.base_memory_store import Message, Session
+
+logger = logging.getLogger(__name__)
+
+
+def create_table(
+        tablestore_client: tablestore.OTSClient,
+        table_name: str,
+        schema_of_primary_key: List[Tuple[str, MetaType]],
+        defined_columns: List[Tuple[str, MetaType]] = None,
+) -> None:
+    schema_of_primary_key = [(t[0], t[1].value) for t in schema_of_primary_key]
+    defined_columns = [] if defined_columns is None else [(t[0], t[1].value) for t in defined_columns]
+    table_meta = tablestore.TableMeta(table_name, schema_of_primary_key, defined_columns)
+    table_options = tablestore.TableOptions()
+    reserved_throughput = tablestore.ReservedThroughput(tablestore.CapacityUnit(0, 0))
+    try:
+        tablestore_client.create_table(table_meta, table_options, reserved_throughput)
+        logger.info("Tablestore create table[%s] successfully.", table_name)
+    except Exception as e:
+        logger.exception("Tablestore create table[%s] failed", table_name)
+        raise e
+
+
+def create_secondary_index(
+        tablestore_client: tablestore.OTSClient,
+        table_name: str,
+        secondary_index_name: str,
+        primary_key_names: List[str],
+        defined_column_names: List[str],
+        index_type=SecondaryIndexType.LOCAL_INDEX,
+) -> None:
+    index_meta = SecondaryIndexMeta(secondary_index_name, primary_key_names, defined_column_names, index_type)
+    include_base_data = False
+    try:
+        tablestore_client.create_secondary_index(table_name, index_meta, include_base_data)
+        logger.info("Tablestore create secondary_index[%s] successfully.", secondary_index_name)
+    except Exception as e:
+        logger.exception("Tablestore create secondary_index[%s] failed", secondary_index_name)
+        raise e
+
+
+def delete_table(
+        tablestore_client: tablestore.OTSClient,
+        table_name: str,
+) -> None:
+    """Delete table if exists."""
+    try:
+        search_index_list = tablestore_client.list_search_index(table_name=table_name)
+        for resp_tuple in search_index_list:
+            tablestore_client.delete_search_index(resp_tuple[0], resp_tuple[1])
+            logger.info("Tablestore delete search index[%s] successfully.", resp_tuple[1])
+    except tablestore.OTSServiceError as e:
+        if (
+                e.get_error_code() == "OTSParameterInvalid" or e.get_error_code() == "OTSObjectNotExist"
+        ) and "does not exist" in e.get_error_message():
+            logger.exception("delete table[%s] failed, which is not exist", table_name)
+        else:
+            raise e
+
+    try:
+        tablestore_client.delete_table(table_name)
+        logger.info("Tablestore delete table[%s] successfully.", table_name)
+    except tablestore.OTSServiceError as e:
+        if e.get_error_code() == "OTSObjectNotExist" and "does not exist" in e.get_error_message():
+            logger.exception("delete table[%s] failed, which is not exist", table_name)
+        else:
+            raise e
+
+
+def meta_data_to_ots_columns(metadata: Dict[str, Any]) -> List[Tuple]:
+    metadata_columns = []
+    for meta_key in metadata:
+        meta_value = metadata[meta_key]
+        if isinstance(meta_value, bool):
+            metadata_columns.append((meta_key, meta_value))
+        elif isinstance(meta_value, int):
+            metadata_columns.append((meta_key, meta_value))
+        elif isinstance(meta_value, six.text_type) or isinstance(meta_value, six.binary_type):
+            if isinstance(meta_value, six.text_type):
+                meta_value = meta_value.encode("utf-8")
+            metadata_columns.append((meta_key, meta_value))
+        elif isinstance(meta_value, bytearray):
+            metadata_columns.append((meta_key, meta_value))
+        elif isinstance(meta_value, float):
+            metadata_columns.append((meta_key, meta_value))
+        else:
+            raise RuntimeError("Unsupported column type: " + str(type(meta_value)))
+
+    return metadata_columns
+
+
+def row_to_session(row: Optional[tablestore.Row]) -> Optional[Session]:
+    if row is None:
+        return None
+    if len(row.primary_key) == 2:
+        user_id = row.primary_key[0][1]
+        session_id = row.primary_key[1][1]
+        update_time = None
+    else:
+        user_id = row.primary_key[0][1]
+        update_time = row.primary_key[1][1]
+        session_id = row.primary_key[2][1]
+    metadata = {}
+    for col in row.attribute_columns:
+        key = col[0]
+        val = col[1]
+        if key == "update_time":
+            update_time = val
+            continue
+        metadata[key] = val
+    return Session(
+        user_id=user_id,
+        session_id=session_id,
+        update_time=update_time,
+        metadata=metadata,
+    )
+
+
+def row_to_message_create_time(row: Optional[tablestore.Row]) -> Optional[int]:
+    if row is None:
+        return None
+    create_time = row.primary_key[2][1]
+    assert isinstance(create_time, int)
+    return create_time
+
+
+def row_to_message(row: Optional[tablestore.Row]) -> Optional[Message]:
+    if row is None:
+        return None
+    session_id = row.primary_key[0][1]
+    create_time = row.primary_key[1][1]
+    message_id = row.primary_key[2][1]
+    metadata = {}
+    content = None
+    for col in row.attribute_columns:
+        key = col[0]
+        val = col[1]
+        if key == "content":
+            content = val
+            continue
+        metadata[key] = val
+    return Message(
+        session_id=session_id,
+        message_id=message_id,
+        create_time=create_time,
+        content=content,
+        metadata=metadata,
+    )
+
+
+def paser_table_filters(
+        metadata_filter: Optional[Filter],
+) -> Optional[tablestore.CompositeColumnCondition]:
+    return parse_filters(
+        metadata_filter=metadata_filter,
+        parse_operator_filter_function=parse_table_filter,
+    )
+
+
+def parse_filters(
+        metadata_filter: Optional[Filter],
+        parse_operator_filter_function: Callable[[BaseOperatorFilter], Union[tablestore.SingleColumnCondition]],
+) -> Optional[Union[tablestore.SingleColumnCondition, tablestore.CompositeColumnCondition]]:
+    if metadata_filter is None:
+        return None
+    if isinstance(metadata_filter, BaseConditionFilter):
+        if isinstance(metadata_filter, AND):
+            cond = tablestore.CompositeColumnCondition(tablestore.LogicalOperator.AND)
+            for filter_item in metadata_filter.filters:
+                cond.add_sub_condition(parse_filters(filter_item, parse_operator_filter_function))
+            return cond
+        elif isinstance(metadata_filter, OR):
+            cond = tablestore.CompositeColumnCondition(tablestore.LogicalOperator.OR)
+            for filter_item in metadata_filter.filters:
+                cond.add_sub_condition(parse_filters(filter_item, parse_operator_filter_function))
+            return cond
+        elif isinstance(metadata_filter, NOT):
+            cond = tablestore.CompositeColumnCondition(tablestore.LogicalOperator.NOT)
+            for filter_item in metadata_filter.filters:
+                cond.add_sub_condition(parse_filters(filter_item, parse_operator_filter_function))
+            return cond
+        else:
+            raise ValueError(f"Unsupported filter condition: {metadata_filter}")
+    elif isinstance(metadata_filter, BaseOperatorFilter):
+        return parse_operator_filter_function(metadata_filter)
+
+
+def parse_table_filter(
+        filter_item: BaseOperatorFilter,
+) -> tablestore.SingleColumnCondition:
+    if isinstance(filter_item, BaseOperatorFilter):
+        if isinstance(filter_item, Eq):
+            return SingleColumnCondition(filter_item.meta_key, filter_item.meta_value, ComparatorType.EQUAL)
+        elif isinstance(filter_item, NotEQ):
+            return SingleColumnCondition(filter_item.meta_key, filter_item.meta_value, ComparatorType.NOT_EQUAL)
+        elif isinstance(filter_item, GT):
+            return SingleColumnCondition(
+                filter_item.meta_key,
+                filter_item.meta_value,
+                ComparatorType.GREATER_THAN,
+            )
+        elif isinstance(filter_item, GTE):
+            return SingleColumnCondition(
+                filter_item.meta_key,
+                filter_item.meta_value,
+                ComparatorType.GREATER_EQUAL,
+            )
+        elif isinstance(filter_item, LT):
+            return SingleColumnCondition(filter_item.meta_key, filter_item.meta_value, ComparatorType.LESS_THAN)
+        elif isinstance(filter_item, LTE):
+            return SingleColumnCondition(filter_item.meta_key, filter_item.meta_value, ComparatorType.LESS_EQUAL)
+        else:
+            raise ValueError(
+                f"Unsupported filter type: {type(filter_item)} with key: {filter_item.meta_key}, value: {filter_item.meta_value}"
+            )
+    else:
+        raise ValueError(f"Unsupported filter type: {type(filter_item)}")
+
+
+class GetRangeIterator(Iterator):
+    def __init__(
+            self,
+            tablestore_client: tablestore.OTSClient,
+            table_name: str,
+            translate_function: Callable[[Optional[tablestore.Row]], Optional[Any]],
+            inclusive_start_primary_key: List[Tuple],
+            exclusive_end_primary_key: List[Tuple],
+            metadata_filter: Optional[Filter] = None,
+            order: Order = Order.DESC,
+            batch_size: Optional[int] = None,
+            max_count: Optional[int] = None,
+    ):
+        self.tablestore_client = tablestore_client
+        self.table_name = table_name
+        self.translate_function = translate_function
+        self.condition = paser_table_filters(metadata_filter=metadata_filter)
+        self.order = order
+        self.inclusive_start_primary_key = inclusive_start_primary_key
+        self.exclusive_end_primary_key = exclusive_end_primary_key
+        self.batch_size = batch_size
+        self.row_list = None
+        self.count = 0
+        self.max_count = max_count
+        self._fetch_next_batch()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> Any:
+        if self.max_count is not None and 0 < self.max_count <= self.count:
+            raise StopIteration
+        if not self.row_list and self._has_next_batch():
+            self._fetch_next_batch()
+
+        if not self.row_list:
+            raise StopIteration
+
+        item = self.row_list.pop(0)
+        self.count += 1
+        return self.translate_function(item)
+
+    def _fetch_next_batch(self) -> None:
+        _, next_start_primary_key, row_list, _ = self.tablestore_client.get_range(
+            table_name=self.table_name,
+            direction=self.order.value,
+            inclusive_start_primary_key=self.inclusive_start_primary_key,
+            exclusive_end_primary_key=self.exclusive_end_primary_key,
+            columns_to_get=None,
+            limit=self.batch_size,
+            column_filter=self.condition,
+            max_version=1,
+        )
+        self.row_list = row_list
+        self.inclusive_start_primary_key = next_start_primary_key
+
+    def _has_next_batch(self):
+        return self.inclusive_start_primary_key is not None
+
+
+def batch_delete(
+        tablestore_client: tablestore.OTSClient,
+        table_name: str,
+        iterator: Iterator[Union[Message, Session]]
+) -> None:
+    batch_delete_row_list = []
+
+    def delete_fun():
+        request = tablestore.BatchWriteRowRequest()
+        request.add(tablestore.TableInBatchWriteRowItem(table_name, batch_delete_row_list))
+        try:
+            result = tablestore_client.batch_write_row(request)
+            _, failed_rows = result.get_delete()
+            for f in failed_rows:
+                logger.info(f"delete row failed, error code:{f.error_code}, error msg:{f.error_message}, delete row detail: {batch_delete_row_list[f.index]}")
+        except BaseException as ex:
+            logger.info(f"delete rows failed: {ex}, delete rows detail: {batch_delete_row_list}")
+
+    for item in iterator:
+        if isinstance(item, Message):
+            primary_key = [
+                ("session_id", item.session_id),
+                ("create_time", item.create_time),
+                ("message_id", item.message_id),
+            ]
+        elif isinstance(item, Session):
+            primary_key = [
+                ("user_id", item.user_id),
+                ("session_id", item.session_id),
+            ]
+        else:
+            raise ValueError(f"Unsupported delete item type: {type(item)}")
+        row = tablestore.Row(primary_key)
+        condition = tablestore.Condition(tablestore.RowExistenceExpectation.IGNORE)
+        delete_row_item = tablestore.DeleteRowItem(row, condition)
+        batch_delete_row_list.append(delete_row_item)
+        if len(batch_delete_row_list) == 200:
+            delete_fun()
+    if len(batch_delete_row_list) != 0:
+        delete_fun()
