@@ -107,6 +107,10 @@ class MemoryStore(BaseMemoryStore):
         session = row_to_session(row)
         return session
 
+    def delete_session_and_messages(self, user_id: str, session_id: str) -> None:
+        self.delete_session(user_id=user_id, session_id=session_id)
+        self.delete_messages(session_id=session_id)
+        
     def list_all_sessions(self) -> Iterator[Session]:
         iterator = GetRangeIterator(
             tablestore_client=self._client,
@@ -129,10 +133,10 @@ class MemoryStore(BaseMemoryStore):
             self,
             user_id: str,
             metadata_filter: Optional[Filter] = None,
-            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
             max_count: Optional[int] = None,
+            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
     ) -> Iterator[Session]:
-        batch_size = self._config_batch_size(batch_size,max_count,metadata_filter)
+        batch_size = self._config_batch_size(batch_size, max_count, metadata_filter)
         iterator = GetRangeIterator(
             tablestore_client=self._client,
             table_name=self._session_table_name,
@@ -156,10 +160,11 @@ class MemoryStore(BaseMemoryStore):
     def list_recent_sessions(
             self,
             user_id: str,
+            inclusive_start_update_time: Optional[int] = None,
             inclusive_end_update_time: Optional[int] = None,
             metadata_filter: Optional[Filter] = None,
-            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
             max_count: Optional[int] = None,
+            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
     ) -> Iterator[Session]:
         batch_size = self._config_batch_size(batch_size, max_count, metadata_filter)
         iterator = GetRangeIterator(
@@ -168,7 +173,11 @@ class MemoryStore(BaseMemoryStore):
             translate_function=row_to_session,
             inclusive_start_primary_key=[
                 ("user_id", user_id),
-                ("update_time", tablestore.INF_MAX),
+                (
+                    "update_time",
+                    tablestore.INF_MAX if inclusive_start_update_time is None else inclusive_start_update_time,
+                ),
+                
                 ("session_id", tablestore.INF_MAX),
             ],
             exclusive_end_primary_key=[
@@ -289,8 +298,8 @@ class MemoryStore(BaseMemoryStore):
             inclusive_end_create_time: Optional[int] = None,
             order: Optional[Order] = None,
             metadata_filter: Optional[Filter] = None,
-            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
             max_count: Optional[int] = None,
+            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
     ) -> Iterator[Message]:
         batch_size = self._config_batch_size(batch_size, max_count, metadata_filter)
         if inclusive_start_create_time is not None or inclusive_end_create_time is not None:
@@ -430,7 +439,7 @@ class MemoryStore(BaseMemoryStore):
         return create_time_list[0] if len(create_time_list) != 0 else None
 
     @staticmethod
-    def _config_batch_size(batch_size:Optional[int], max_count:Optional[int], metadata_filter:Optional[Filter]) -> Optional[int]:
+    def _config_batch_size(batch_size: Optional[int], max_count: Optional[int], metadata_filter: Optional[Filter]) -> Optional[int]:
         if batch_size is None and max_count is not None:
             if metadata_filter is None:
                 return min(5000, max_count)

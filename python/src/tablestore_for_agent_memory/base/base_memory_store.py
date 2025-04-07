@@ -90,14 +90,20 @@ class BaseMemoryStore(BaseModel, ABC):
         """
         pass
 
+    def delete_session_and_messages(self, user_id: str, session_id: str) -> None:
+        """
+        删除一个session和其对应的所有会话。
+        """
+        pass
+
     @abstractmethod
     @validate_call
     def list_sessions(
             self,
             user_id: str,
             metadata_filter: Optional[Filter] = None,
-            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
             max_count: Optional[int] = None,
+            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
     ) -> Iterator[Session]:
         """
         列出一个用户的所有会话。
@@ -113,43 +119,87 @@ class BaseMemoryStore(BaseModel, ABC):
     def list_recent_sessions(
             self,
             user_id: str,
+            inclusive_start_update_time: Optional[int] = None,
             inclusive_end_update_time: Optional[int] = None,
             metadata_filter: Optional[Filter] = None,
-            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
             max_count: Optional[int] = None,
+            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
     ) -> Iterator[Session]:
+        """
+        根据Session会话时间列出最近的所有会话信息。
+        :param user_id: 用户id，必传参数。
+        :param inclusive_start_update_time: 起始时间.
+        :param inclusive_end_update_time: 结束时间.
+        :param metadata_filter: metadata过滤条件。
+        :param batch_size: 内部批量获取参数。
+        :param max_count: Iterator中最大的个数。
+        """
         pass
 
     @abstractmethod
     def search_sessions(self, metadata_filter: Filter, limit: Optional[int] = 100) -> Iterator[Session]:
+        """
+        搜索Session.
+        :param metadata_filter: metadata过滤条件。
+        :param limit: 单次返回行数.
+        """
         pass
 
     @abstractmethod
     def put_message(self, message: Message) -> None:
+        """
+        写入一条Message消息.
+        :param message: Message消息
+        """
         pass
 
     @abstractmethod
     def delete_message(self, session_id: str, message_id: str) -> None:
+        """
+        删除一条Message消息.
+        :param session_id: Session会话ID
+        :param message_id: Message消息ID
+        """
         pass
 
     @abstractmethod
     def delete_messages(self, session_id: str) -> None:
+        """
+        删除一个Session会话的所有Message消息.
+        :param session_id: Session会话ID
+        """
         pass
 
     @abstractmethod
     def delete_all_messages(self) -> None:
+        """
+        删除所有Session会话的所有消息.
+        """
         pass
 
     @abstractmethod
     def update_message(self, message: Message) -> None:
+        """
+        更新一条Message消息.
+        :param message: Message消息
+        """
         pass
 
     @abstractmethod
     def get_message(self, session_id: str, message_id: str, create_time: Optional[int] = None) -> Optional[Message]:
+        """
+        查询一条Message消息
+        :param session_id: Session会话ID
+        :param message_id: Message消息ID
+        :param create_time: 创建时间. (可选参数，设置该参数能提高查询性能)
+        """
         pass
 
     @abstractmethod
     def get_all_messages(self) -> Iterator[Message]:
+        """
+        获取所有Session会话的所有消息.
+        """
         pass
 
     @abstractmethod
@@ -161,9 +211,19 @@ class BaseMemoryStore(BaseModel, ABC):
             inclusive_end_create_time: Optional[int] = None,
             order: Optional[Order] = None,
             metadata_filter: Optional[Filter] = None,
-            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
             max_count: Optional[int] = None,
+            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
     ) -> Iterator[Message]:
+        """
+        返回一个Session会话的所有消息。可以根据参数条件进行过滤.
+        :param session_id: Session会话ID
+        :param inclusive_start_create_time: 起始时间
+        :param inclusive_end_create_time: 结束时间
+        :param order: 按照创建时间正序还是逆序查询数据
+        :param metadata_filter: metadata过滤条件。
+        :param max_count: Iterator中最大的个数。
+        :param batch_size: 内部批量获取参数。
+        """
         pass
 
     @abstractmethod
