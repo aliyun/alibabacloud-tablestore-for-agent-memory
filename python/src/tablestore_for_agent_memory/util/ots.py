@@ -1,6 +1,9 @@
+import json
 import logging
 from collections.abc import Iterable, Iterator
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+import base64
+
 
 import six
 import tablestore
@@ -306,6 +309,12 @@ class GetRangeIterator(Iterator):
     def _has_next_batch(self):
         return self.inclusive_start_primary_key is not None
 
+    def next_start_primary_key(self):
+        if len(self.row_list) > 0:
+            return self.row_list[0]
+        else:
+            return self.inclusive_start_primary_key
+
 
 def batch_delete(
         tablestore_client: tablestore.OTSClient,
@@ -347,3 +356,14 @@ def batch_delete(
             delete_fun()
     if len(batch_delete_row_list) != 0:
         delete_fun()
+
+
+def encode_next_primary_key_token(next_primary_key: List[Tuple]) -> str:
+    json_str = json.dumps(next_primary_key, ensure_ascii=False)
+    return base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+
+
+def decode_next_primary_key_token(next_token: str) -> List[Tuple]:
+    next_token_json_str = base64.b64decode(next_token.encode('utf-8')).decode('utf-8')
+    keys = json.loads(next_token_json_str)
+    return [(key[0],key[1]) for key in keys]

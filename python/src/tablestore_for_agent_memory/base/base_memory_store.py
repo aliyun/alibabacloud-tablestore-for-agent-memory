@@ -126,13 +126,38 @@ class BaseMemoryStore(BaseModel, ABC):
             batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
     ) -> Iterator[Session]:
         """
-        根据Session会话时间列出最近的所有会话信息。
+        列出最近的所有会话信息，根据Session会话更新时间排序。
         :param user_id: 用户id，必传参数。
         :param inclusive_start_update_time: 起始时间.
         :param inclusive_end_update_time: 结束时间.
         :param metadata_filter: metadata过滤条件。
         :param batch_size: 内部批量获取参数。
         :param max_count: Iterator中最大的个数。
+        """
+        pass
+    
+    @abstractmethod
+    @validate_call
+    def list_recent_sessions_paginated(
+            self,
+            user_id: str,
+            page_size: int = 100,
+            next_token: Optional[str] = None,
+            inclusive_start_update_time: Optional[int] = None,
+            inclusive_end_update_time: Optional[int] = None,
+            metadata_filter: Optional[Filter] = None,
+            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
+    ) -> (List[Session], Optional[str]):
+        """
+        使用连续翻页方式，列出最近的所有会话信息，根据Session会话更新时间排序。
+        :rtype: (Session信息, 下一次访问的token)
+        :param user_id: 用户id，必传参数。
+        :param page_size: 返回的Session会话个数
+        :param next_token: 下次翻页的token
+        :param inclusive_start_update_time: 起始时间.
+        :param inclusive_end_update_time: 结束时间.
+        :param metadata_filter: metadata过滤条件。
+        :param batch_size: 内部批量获取参数。
         """
         pass
 

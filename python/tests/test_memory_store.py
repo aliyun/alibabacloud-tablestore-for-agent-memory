@@ -81,11 +81,16 @@ def memory_store():
         "meta_bytes": MetaType.BINARY,
     }
 
+    tablestore_client = tablestore.OTSClient(
+        endpoint,
+        access_key_id,
+        access_key_secret,
+        instance_name,
+        retry_policy=tablestore.WriteRetryPolicy(),
+    )
+
     memory_store = MemoryStore(
-        endpoint=endpoint,
-        instance_name=instance_name,
-        access_key_id=access_key_id,
-        access_key_secret=access_key_secret,
+        tablestore_client=tablestore_client,
         session_secondary_index_meta=session_secondary_index_meta,
     )
     return memory_store
@@ -299,6 +304,16 @@ def test_get_sessions(memory_store, tablestore_client):
     )
     update_times = [item.update_time for item in sessions]
     assert all(x >= 50 for x in update_times), f"Not all elements are greater than 50, but is:{update_times}"
+
+    sessions = list(memory_store.list_recent_sessions(user_id="1"))
+    sessions_paginated = []
+    token = None
+    while True:
+        sub_sessions, token = memory_store.list_recent_sessions_paginated(user_id="1", page_size=3, next_token=token)
+        sessions_paginated.extend(sub_sessions)
+        if token is None:
+            break
+    assert sessions_paginated == sessions
 
     memory_store.delete_sessions(user_id="1")
     sessions = list(memory_store.list_sessions(user_id="1"))

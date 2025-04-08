@@ -20,7 +20,7 @@ from tablestore_for_agent_memory.util.ots import (
     delete_table,
     meta_data_to_ots_columns,
     row_to_message,
-    row_to_session, row_to_message_create_time, batch_delete,
+    row_to_session, row_to_message_create_time, batch_delete, encode_next_primary_key_token, decode_next_primary_key_token,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,10 +30,7 @@ class MemoryStore(BaseMemoryStore):
 
     def __init__(
             self,
-            endpoint: Optional[str] = None,
-            instance_name: Optional[str] = None,
-            access_key_id: Optional[str] = None,
-            access_key_secret: Optional[str] = None,
+            tablestore_client: tablestore.OTSClient,
             session_table_name: Optional[str] = "session",
             session_secondary_index_name: Optional[str] = "session_secondary_index",
             session_secondary_index_meta: Optional[Dict[str, MetaType]] = None,
@@ -50,14 +47,7 @@ class MemoryStore(BaseMemoryStore):
         self._message_table_name = message_table_name
         self._message_search_index_name = message_search_index_name
         self._message_secondary_index_name = message_secondary_index_name
-        self._client = tablestore.OTSClient(
-            endpoint,
-            access_key_id,
-            access_key_secret,
-            instance_name,
-            retry_policy=tablestore.WriteRetryPolicy(),
-            **kwargs,
-        )
+        self._client = tablestore_client
 
     def init_table(self) -> None:
         """
@@ -110,7 +100,7 @@ class MemoryStore(BaseMemoryStore):
     def delete_session_and_messages(self, user_id: str, session_id: str) -> None:
         self.delete_session(user_id=user_id, session_id=session_id)
         self.delete_messages(session_id=session_id)
-        
+
     def list_all_sessions(self) -> Iterator[Session]:
         iterator = GetRangeIterator(
             tablestore_client=self._client,
@@ -177,7 +167,7 @@ class MemoryStore(BaseMemoryStore):
                     "update_time",
                     tablestore.INF_MAX if inclusive_start_update_time is None else inclusive_start_update_time,
                 ),
-                
+
                 ("session_id", tablestore.INF_MAX),
             ],
             exclusive_end_primary_key=[
@@ -195,6 +185,54 @@ class MemoryStore(BaseMemoryStore):
             max_count=max_count,
         )
         return iterator
+
+    @validate_call
+    def list_recent_sessions_paginated(
+            self,
+            user_id: str,
+            page_size: int = 100,
+            next_token: Optional[str] = None,
+            inclusive_start_update_time: Optional[int] = None,
+            inclusive_end_update_time: Optional[int] = None,
+            metadata_filter: Optional[Filter] = None,
+            batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
+    ) -> (List[Session], Optional[str]):
+        batch_size = self._config_batch_size(batch_size, page_size, metadata_filter)
+        if next_token is None:
+            inclusive_start_primary_key = [
+                ("user_id", user_id),
+                (
+                    "update_time",
+                    tablestore.INF_MAX if inclusive_start_update_time is None else inclusive_start_update_time,
+                ),
+
+                ("session_id", tablestore.INF_MAX),
+            ]
+        else:
+            inclusive_start_primary_key = decode_next_primary_key_token(next_token)
+        iterator = GetRangeIterator(
+            tablestore_client=self._client,
+            table_name=self._session_secondary_index_name,
+            translate_function=row_to_session,
+            inclusive_start_primary_key=inclusive_start_primary_key,
+            exclusive_end_primary_key=[
+                ("user_id", user_id),
+                (
+                    "update_time",
+                    tablestore.INF_MIN if inclusive_end_update_time is None else inclusive_end_update_time,
+                ),
+                ("session_id", tablestore.INF_MIN),
+
+            ],
+            metadata_filter=metadata_filter,
+            order=Order.DESC,
+            batch_size=batch_size,
+            max_count=page_size,
+        )
+        sessions = list(iterator)
+        next_primary_key = iterator.next_start_primary_key()
+        next_token = None if next_primary_key is None else encode_next_primary_key_token(next_primary_key)
+        return sessions, next_token
 
     def search_sessions(self, metadata_filter: Filter, limit: Optional[int] = 100) -> Iterator[Session]:
         pass
