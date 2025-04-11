@@ -161,12 +161,18 @@ class BaseMemoryStore(BaseModel, ABC):
         """
         pass
 
+    @validate_call
     @abstractmethod
-    def search_sessions(self, metadata_filter: Filter, limit: Optional[int] = 100) -> Iterator[Session]:
+    def search_sessions(self, 
+                        metadata_filter:  Optional[Filter]=None,
+                        limit: Optional[int] = Field(default=100, le=100, ge=1), 
+                        next_token: Optional[str] = None
+                        ) -> (List[Session], Optional[str]):
         """
         搜索Session.
         :param metadata_filter: metadata过滤条件。
         :param limit: 单次返回行数.
+        :param next_token: 下次翻页的token
         """
         pass
 
@@ -251,6 +257,17 @@ class BaseMemoryStore(BaseModel, ABC):
         """
         pass
 
+    @validate_call
     @abstractmethod
-    def search_messages(self, metadata_filter: Filter, limit: Optional[int] = 100) -> Iterator[Message]:
+    def search_messages(self,
+                        metadata_filter: Optional[Filter] = None, 
+                        limit: Optional[int] = Field(default=100, le=100, ge=1),
+                        next_token: Optional[str] = None
+                        ) -> (List[Message], Optional[str]):
+        """
+        搜索 Message.
+        :param metadata_filter: metadata过滤条件。
+        :param limit: 单次返回行数.
+        :param next_token: 下次翻页的token
+        """
         pass

@@ -1,3 +1,5 @@
+import base64
+import json
 import logging
 import time
 from typing import Any, Dict, Iterator, List, Optional
@@ -20,12 +22,14 @@ from tablestore_for_agent_memory.util.ots import (
     delete_table,
     meta_data_to_ots_columns,
     row_to_message,
-    row_to_session, row_to_message_create_time, batch_delete, encode_next_primary_key_token, decode_next_primary_key_token,
+    row_to_session, row_to_message_create_time, batch_delete, encode_next_primary_key_token, decode_next_primary_key_token, add_schema, create_search_index_if_not_exist, paser_search_index_filters, search_response_to_sessions,
+    search_response_to_message,
 )
 
 logger = logging.getLogger(__name__)
 
 
+# noinspection DuplicatedCode
 class MemoryStore(BaseMemoryStore):
 
     def __init__(
@@ -34,9 +38,12 @@ class MemoryStore(BaseMemoryStore):
             session_table_name: Optional[str] = "session",
             session_secondary_index_name: Optional[str] = "session_secondary_index",
             session_secondary_index_meta: Optional[Dict[str, MetaType]] = None,
+            session_search_index_name: Optional[str] = "session_search_index_name",
+            session_search_index_schema: Optional[List[tablestore.FieldSchema]] = None,
             message_table_name: Optional[str] = "message",
             message_search_index_name: Optional[str] = "message_search_index",
             message_secondary_index_name: Optional[str] = "message_secondary_index",
+            message_search_index_schema: Optional[List[tablestore.FieldSchema]] = None,
             **kwargs: Any,
     ):
         super().__init__()
@@ -44,9 +51,12 @@ class MemoryStore(BaseMemoryStore):
         self._session_secondary_index_name = session_secondary_index_name
         self._session_secondary_index_meta = session_secondary_index_meta
         self._session_secondary_index_meta["update_time"] = MetaType.INTEGER
+        self._session_search_index_name = session_search_index_name
+        self._session_search_index_schema = session_search_index_schema
         self._message_table_name = message_table_name
-        self._message_search_index_name = message_search_index_name
         self._message_secondary_index_name = message_secondary_index_name
+        self._message_search_index_name = message_search_index_name
+        self._message_search_index_schema = message_search_index_schema
         self._client = tablestore_client
 
     def init_table(self) -> None:
@@ -58,6 +68,13 @@ class MemoryStore(BaseMemoryStore):
         self._create_message_table()
         self._create_message_secondary_index()
         time.sleep(1)
+
+    def init_search_index(self) -> None:
+        """
+        初始化多元索引
+        """
+        self._create_session_search_index()
+        self._create_message_search_index()
 
     def put_session(self, session: Session) -> None:
         primary_key = [("user_id", session.user_id), ("session_id", session.session_id)]
@@ -234,8 +251,44 @@ class MemoryStore(BaseMemoryStore):
         next_token = None if next_primary_key is None else encode_next_primary_key_token(next_primary_key)
         return sessions, next_token
 
-    def search_sessions(self, metadata_filter: Filter, limit: Optional[int] = 100) -> Iterator[Session]:
-        pass
+    @validate_call
+    def search_sessions(self,
+                        metadata_filter: Optional[Filter] = None,
+                        limit: Optional[int] = Field(default=100, le=100, ge=1),
+                        next_token: Optional[str] = None
+                        ) -> (List[Session], Optional[str]):
+        ots_query, need_score_sort = paser_search_index_filters(metadata_filter=metadata_filter)
+        sort = tablestore.Sort(sorters=[tablestore.ScoreSort(sort_order=tablestore.SortOrder.DESC)]) if need_score_sort else None
+        if next_token:
+            next_token = base64.b64decode(next_token.encode('utf-8'))
+        search_query = tablestore.SearchQuery(
+            ots_query, limit=limit, get_total_count=False, sort=sort, next_token=next_token
+        )
+        try:
+            search_response = self._client.search(
+                table_name=self._session_table_name,
+                index_name=self._session_search_index_name,
+                search_query=search_query,
+                columns_to_get=tablestore.ColumnsToGet(
+                    return_type=tablestore.ColumnReturnType.ALL
+                ),
+            )
+        except tablestore.OTSClientError as e:
+            logger.exception("tablestore search session failed with client error:%s", e)
+            raise e
+        except tablestore.OTSServiceError as e:
+            logger.exception(
+                "tablestore search session failed with error:%s, http_status:%d, error_code:%s, error_message:%s, request_id:%s",
+                e,
+                e.get_http_status(),
+                e.get_error_code(),
+                e.get_error_message(),
+                e.get_request_id(),
+            )
+            raise e
+        sessions, next_token = search_response_to_sessions(search_response=search_response)
+        logger.info(f"tablestore search session index successfully. request_id:[{search_response.request_id}], metadata_filter:[{metadata_filter}], limit:[{limit}], next_token:[{next_token}]")
+        return sessions, next_token
 
     def put_message(self, message: Message) -> None:
         if message.create_time is None:
@@ -379,8 +432,44 @@ class MemoryStore(BaseMemoryStore):
         )
         return iterator
 
-    def search_messages(self, metadata_filter: Filter, limit: Optional[int] = 100) -> Iterator[Message]:
-        pass
+    @validate_call
+    def search_messages(self,
+                        metadata_filter: Optional[Filter] = None,
+                        limit: Optional[int] = Field(default=100, le=100, ge=1),
+                        next_token: Optional[str] = None
+                        ) -> (List[Message], Optional[str]):
+        ots_query, need_score_sort = paser_search_index_filters(metadata_filter=metadata_filter)
+        sort = tablestore.Sort(sorters=[tablestore.ScoreSort(sort_order=tablestore.SortOrder.DESC)]) if need_score_sort else None
+        if next_token:
+            next_token = base64.b64decode(next_token.encode('utf-8'))
+        search_query = tablestore.SearchQuery(
+            ots_query, limit=limit, get_total_count=False, sort=sort, next_token=next_token
+        )
+        try:
+            search_response = self._client.search(
+                table_name=self._message_table_name,
+                index_name=self._message_search_index_name,
+                search_query=search_query,
+                columns_to_get=tablestore.ColumnsToGet(
+                    return_type=tablestore.ColumnReturnType.ALL
+                ),
+            )
+        except tablestore.OTSClientError as e:
+            logger.exception("tablestore search message failed with client error:%s", e)
+            raise e
+        except tablestore.OTSServiceError as e:
+            logger.exception(
+                "tablestore search message failed with error:%s, http_status:%d, error_code:%s, error_message:%s, request_id:%s",
+                e,
+                e.get_http_status(),
+                e.get_error_code(),
+                e.get_error_message(),
+                e.get_request_id(),
+            )
+            raise e
+        messages, next_token = search_response_to_message(search_response=search_response)
+        logger.info(f"tablestore search message index successfully. request_id:[{search_response.request_id}], metadata_filter:[{metadata_filter}], limit:[{limit}], next_token:[{next_token}]")
+        return messages, next_token
 
     def _create_session_table(self) -> None:
         """ 
@@ -422,6 +511,58 @@ class MemoryStore(BaseMemoryStore):
             self._session_secondary_index_name,
             primary_key_for_session_secondary_index,
             session_defined_columns_for_secondary_index,
+        )
+
+    def _create_session_search_index(self):
+        """Create session search index if not exist."""
+        if self._session_search_index_schema is None:
+            logger.warning("skip create session search index because session_search_index_schema is empty")
+            return
+        self._session_search_index_schema = add_schema(
+            tablestore.FieldSchema("user_id", tablestore.FieldType.KEYWORD),
+            self._session_search_index_schema
+        )
+        self._session_search_index_schema = add_schema(
+            tablestore.FieldSchema("session_id", tablestore.FieldType.KEYWORD),
+            self._session_search_index_schema
+        )
+        self._session_search_index_schema = add_schema(
+            tablestore.FieldSchema("update_time", tablestore.FieldType.LONG),
+            self._session_search_index_schema
+        )
+        create_search_index_if_not_exist(
+            tablestore_client=self._client,
+            table_name=self._session_table_name,
+            index_name=self._session_search_index_name,
+            index_schemas=self._session_search_index_schema,
+        )
+
+    def _create_message_search_index(self):
+        """Create message search index if not exist."""
+        if self._message_search_index_schema is None:
+            logger.warning("skip create message search index because message_search_index_schema is empty")
+            return
+        self._message_search_index_schema = add_schema(
+            tablestore.FieldSchema("session_id", tablestore.FieldType.KEYWORD),
+            self._message_search_index_schema
+        )
+        self._message_search_index_schema = add_schema(
+            tablestore.FieldSchema("message_id", tablestore.FieldType.KEYWORD),
+            self._message_search_index_schema
+        )
+        self._message_search_index_schema = add_schema(
+            tablestore.FieldSchema("create_time", tablestore.FieldType.LONG),
+            self._message_search_index_schema
+        )
+        self._message_search_index_schema = add_schema(
+            tablestore.FieldSchema("content", tablestore.FieldType.TEXT, analyzer=tablestore.AnalyzerType.MAXWORD),
+            self._message_search_index_schema
+        )
+        create_search_index_if_not_exist(
+            tablestore_client=self._client,
+            table_name=self._message_table_name,
+            index_name=self._message_search_index_name,
+            index_schemas=self._message_search_index_schema,
         )
 
     def _create_message_table(self) -> None:

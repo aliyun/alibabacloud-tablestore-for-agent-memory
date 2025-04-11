@@ -1,18 +1,17 @@
 import json
 import logging
+import time
 from collections.abc import Iterable, Iterator
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import base64
 
-
 import six
 import tablestore
-from numpy.ma.core import count
 from tablestore import (
     ComparatorType,
     SecondaryIndexMeta,
     SecondaryIndexType,
-    SingleColumnCondition,
+    SingleColumnCondition, Query, MatchAllQuery, BoolQuery, SyncPhase,
 )
 
 from tablestore_for_agent_memory.base.common import MetaType, Order
@@ -28,7 +27,7 @@ from tablestore_for_agent_memory.base.filter import (
     BaseOperatorFilter,
     Eq,
     Filter,
-    NotEQ,
+    NotEQ, IN, NotIN, TextMatchPhrase, TextMatch, All,
 )
 from tablestore_for_agent_memory.base.base_memory_store import Message, Session
 
@@ -41,6 +40,10 @@ def create_table(
         schema_of_primary_key: List[Tuple[str, MetaType]],
         defined_columns: List[Tuple[str, MetaType]] = None,
 ) -> None:
+    table_names = tablestore_client.list_table()
+    if table_name in table_names:
+        logger.warning(f"tablestore table:[{table_name}] already exists")
+        return
     schema_of_primary_key = [(t[0], t[1].value) for t in schema_of_primary_key]
     defined_columns = [] if defined_columns is None else [(t[0], t[1].value) for t in defined_columns]
     table_meta = tablestore.TableMeta(table_name, schema_of_primary_key, defined_columns)
@@ -62,6 +65,10 @@ def create_secondary_index(
         defined_column_names: List[str],
         index_type=SecondaryIndexType.LOCAL_INDEX,
 ) -> None:
+    describe_table_response = tablestore_client.describe_table(table_name)
+    if secondary_index_name in [index.index_name for index in describe_table_response.secondary_indexes]:
+        logger.warning(f"tablestore secondary index:[{secondary_index_name}] already exists")
+        return
     index_meta = SecondaryIndexMeta(secondary_index_name, primary_key_names, defined_column_names, index_type)
     include_base_data = False
     try:
@@ -184,13 +191,13 @@ def row_to_message(row: Optional[tablestore.Row]) -> Optional[Message]:
 def paser_table_filters(
         metadata_filter: Optional[Filter],
 ) -> Optional[tablestore.CompositeColumnCondition]:
-    return parse_filters(
+    return inner_parse_table_filters(
         metadata_filter=metadata_filter,
         parse_operator_filter_function=parse_table_filter,
     )
 
 
-def parse_filters(
+def inner_parse_table_filters(
         metadata_filter: Optional[Filter],
         parse_operator_filter_function: Callable[[BaseOperatorFilter], Union[tablestore.SingleColumnCondition]],
 ) -> Optional[Union[tablestore.SingleColumnCondition, tablestore.CompositeColumnCondition]]:
@@ -200,17 +207,17 @@ def parse_filters(
         if isinstance(metadata_filter, AND):
             cond = tablestore.CompositeColumnCondition(tablestore.LogicalOperator.AND)
             for filter_item in metadata_filter.filters:
-                cond.add_sub_condition(parse_filters(filter_item, parse_operator_filter_function))
+                cond.add_sub_condition(inner_parse_table_filters(filter_item, parse_operator_filter_function))
             return cond
         elif isinstance(metadata_filter, OR):
             cond = tablestore.CompositeColumnCondition(tablestore.LogicalOperator.OR)
             for filter_item in metadata_filter.filters:
-                cond.add_sub_condition(parse_filters(filter_item, parse_operator_filter_function))
+                cond.add_sub_condition(inner_parse_table_filters(filter_item, parse_operator_filter_function))
             return cond
         elif isinstance(metadata_filter, NOT):
             cond = tablestore.CompositeColumnCondition(tablestore.LogicalOperator.NOT)
             for filter_item in metadata_filter.filters:
-                cond.add_sub_condition(parse_filters(filter_item, parse_operator_filter_function))
+                cond.add_sub_condition(inner_parse_table_filters(filter_item, parse_operator_filter_function))
             return cond
         else:
             raise ValueError(f"Unsupported filter condition: {metadata_filter}")
@@ -242,6 +249,112 @@ def parse_table_filter(
             return SingleColumnCondition(filter_item.meta_key, filter_item.meta_value, ComparatorType.LESS_THAN)
         elif isinstance(filter_item, LTE):
             return SingleColumnCondition(filter_item.meta_key, filter_item.meta_value, ComparatorType.LESS_EQUAL)
+        else:
+            raise ValueError(
+                f"Unsupported filter type: {type(filter_item)} with key: {filter_item.meta_key}, value: {filter_item.meta_value}"
+            )
+    else:
+        raise ValueError(f"Unsupported filter type: {type(filter_item)}")
+
+
+def paser_search_index_filters(
+        metadata_filter: Optional[Filter],
+) -> (tablestore.Query, bool):
+    return inner_parse_search_index_filters(
+        metadata_filter=metadata_filter,
+        parse_operator_filter_function=parse_search_index_filter,
+    )
+
+
+def inner_parse_search_index_filters(
+        metadata_filter: Optional[Filter],
+        parse_operator_filter_function: Callable[[BaseOperatorFilter], Tuple[tablestore.Query, bool]],
+) -> (Union[Query, MatchAllQuery, BoolQuery, None], bool):
+    if metadata_filter is None:
+        return tablestore.MatchAllQuery(), False
+    if isinstance(metadata_filter, BaseConditionFilter):
+        bool_query = tablestore.BoolQuery(
+            must_queries=[],
+            must_not_queries=[],
+            filter_queries=[],
+            should_queries=[],
+            minimum_should_match=None,
+        )
+        if isinstance(metadata_filter, AND):
+            need_score_sort = False
+            for filter_item in metadata_filter.filters:
+                q, _need_score_sort = inner_parse_search_index_filters(filter_item, parse_operator_filter_function)
+                need_score_sort = need_score_sort and _need_score_sort
+                bool_query.must_queries.append(q)
+            return bool_query, need_score_sort
+        elif isinstance(metadata_filter, OR):
+            need_score_sort = False
+            for filter_item in metadata_filter.filters:
+                q, _need_score_sort = inner_parse_search_index_filters(filter_item, parse_operator_filter_function)
+                need_score_sort = need_score_sort and _need_score_sort
+                bool_query.should_queries.append(q)
+            return bool_query,need_score_sort
+        elif isinstance(metadata_filter, NOT):
+            need_score_sort = False
+            for filter_item in metadata_filter.filters:
+                q, _need_score_sort = inner_parse_search_index_filters(filter_item, parse_operator_filter_function)
+                need_score_sort = need_score_sort and _need_score_sort
+                bool_query.must_not_queries.append(q)
+            return bool_query, need_score_sort
+        else:
+            raise ValueError(f"Unsupported filter condition: {metadata_filter}")
+    elif isinstance(metadata_filter, BaseOperatorFilter):
+        return parse_operator_filter_function(metadata_filter)
+
+
+def parse_search_index_filter(
+        filter_item: BaseOperatorFilter,
+) -> (tablestore.Query,bool):
+    if isinstance(filter_item, BaseOperatorFilter):
+        if isinstance(filter_item, Eq):
+            return tablestore.TermQuery(field_name=filter_item.meta_key, column_value=filter_item.meta_value), False
+        elif isinstance(filter_item, NotEQ):
+            bool_query = tablestore.BoolQuery(
+                must_queries=[],
+                must_not_queries=[],
+                filter_queries=[],
+                should_queries=[],
+                minimum_should_match=None,
+            )
+            bool_query.must_not_queries.append(tablestore.TermQuery(field_name=filter_item.meta_key, column_value=filter_item.meta_value))
+            return bool_query , False
+        elif isinstance(filter_item, GT):
+            return tablestore.RangeQuery(
+                field_name=filter_item.meta_key, range_from=filter_item.meta_value, include_lower=False
+            ) , False
+        elif isinstance(filter_item, GTE):
+            return tablestore.RangeQuery(
+                field_name=filter_item.meta_key, range_from=filter_item.meta_value, include_lower=True
+            ), False
+        elif isinstance(filter_item, LT):
+            return tablestore.RangeQuery(
+                field_name=filter_item.meta_key, range_to=filter_item.meta_value, include_upper=False
+            ), False
+        elif isinstance(filter_item, LTE):
+            return tablestore.RangeQuery(
+                field_name=filter_item.meta_key, range_to=filter_item.meta_value, include_upper=True
+            ), False
+        elif isinstance(filter_item, NotIN):
+            bool_query = tablestore.BoolQuery(
+                must_queries=[],
+                must_not_queries=[],
+                filter_queries=[],
+                should_queries=[],
+                minimum_should_match=None,
+            )
+            bool_query.must_not_queries.append(tablestore.TermsQuery(field_name=filter_item.meta_key, column_values=filter_item.meta_values))
+            return bool_query, False
+        elif isinstance(filter_item, TextMatch):
+            return tablestore.MatchQuery(field_name=filter_item.meta_key, text=filter_item.meta_value), True
+        elif isinstance(filter_item, TextMatchPhrase):
+            return tablestore.MatchPhraseQuery(field_name=filter_item.meta_key, text=filter_item.meta_value), True
+        elif isinstance(filter_item, All):
+            return tablestore.MatchAllQuery(), False
         else:
             raise ValueError(
                 f"Unsupported filter type: {type(filter_item)} with key: {filter_item.meta_key}, value: {filter_item.meta_value}"
@@ -366,4 +479,107 @@ def encode_next_primary_key_token(next_primary_key: List[Tuple]) -> str:
 def decode_next_primary_key_token(next_token: str) -> List[Tuple]:
     next_token_json_str = base64.b64decode(next_token.encode('utf-8')).decode('utf-8')
     keys = json.loads(next_token_json_str)
-    return [(key[0],key[1]) for key in keys]
+    return [(key[0], key[1]) for key in keys]
+
+
+def add_schema(new_schema: tablestore.FieldSchema, schemas: Optional[List[tablestore.FieldSchema]] = None) -> List[tablestore.FieldSchema]:
+    if schemas is None:
+        return [new_schema]
+    else:
+        for schema in schemas:
+            if schema.field_name == new_schema.field_name:
+                return schemas
+        schemas.append(new_schema)
+        return schemas
+
+
+def create_search_index_if_not_exist(
+        tablestore_client: tablestore.OTSClient,
+        table_name: str,
+        index_name: str,
+        index_schemas: List[tablestore.FieldSchema],
+):
+    search_index_list = tablestore_client.list_search_index(
+        table_name=table_name
+    )
+    if index_name in [t[1] for t in search_index_list]:
+        logger.warning(f"tablestore message index[{index_name}] already exists")
+        return
+    index_meta = tablestore.SearchIndexMeta(index_schemas)
+    tablestore_client.create_search_index(
+        table_name, index_name, index_meta
+    )
+    logger.info(f"tablestore create message index[{index_name}] successfully.")
+
+
+def search_response_to_sessions(search_response: tablestore.SearchResponse) -> (List[Session], Optional[str]):
+    sessions = []
+    next_token = search_response.next_token
+    if next_token:
+        next_token = base64.b64encode(next_token).decode('utf-8')
+    else:
+        next_token = None
+    for hit in search_response.search_hits:
+        row = hit.row
+        user_id = row[0][0][1]
+        session_id = row[0][1][1]
+        meta_data = {}
+        update_time = None
+        for col in row[1]:
+            key = col[0]
+            val = col[1]
+            if key == "update_time":
+                update_time = val
+                continue
+            meta_data[key] = val
+        session = Session(user_id=user_id, session_id=session_id, update_time=update_time, metadata=meta_data)
+        sessions.append(session)
+    return sessions, next_token
+
+def search_response_to_message(search_response: tablestore.SearchResponse) -> (List[Message], Optional[str]):
+    messages = []
+    next_token = search_response.next_token
+    if next_token:
+        next_token = base64.b64encode(next_token).decode('utf-8')
+    else:
+        next_token = None
+    for hit in search_response.search_hits:
+        row = hit.row
+        session_id = row[0][0][1]
+        create_time = row[0][1][1]
+        message_id = row[0][2][1]
+        meta_data = {}
+        content = None
+        for col in row[1]:
+            key = col[0]
+            val = col[1]
+            if key == "content":
+                content = val
+                continue
+            meta_data[key] = val
+        message = Message(session_id=session_id, message_id=message_id, create_time=create_time, content=content, metadata=meta_data)
+        messages.append(message)
+    return messages, next_token
+
+
+def wait_search_index_ready(tablestore_client: tablestore.OTSClient,
+                            table_name: str,
+                            index_name: str,
+                            total_count:int
+                            ) -> None:
+    max_wait_time = 300
+    interval_time = 1
+    start_time = time.time()
+    while max_wait_time > 0:
+        search_response = tablestore_client.search(
+            table_name=table_name,
+            index_name=index_name,
+            search_query=tablestore.SearchQuery(tablestore.MatchAllQuery(), limit=0, get_total_count=True),
+            columns_to_get=tablestore.ColumnsToGet(return_type=tablestore.ColumnReturnType.NONE),
+        )
+        if search_response.total_count == total_count:
+            print(f'table:[{table_name}] search index:[{index_name}] ready! use time:{time.time() - start_time}')
+            return
+        time.sleep(interval_time)
+        max_wait_time = max_wait_time - interval_time
+    assert False, f'table:[{table_name}] search index:[{index_name}] is not ready!! use time:{time.time() - start_time}'

@@ -10,7 +10,6 @@ format:	## Run code auto formatters (black).
 	poetry run black **/*.ipynb 
 
 lint:
-	poetry run isort **/*.py -c -v --diff --thirdparty ansible
 	poetry run autoflake --remove-unused-variables --expand-star-imports --remove-all-unused-imports --ignore-pass-after-docstring -cd **/*py
 	poetry run black **/*.py --check --diff
 	poetry run black **/*.ipynb --check --diff
