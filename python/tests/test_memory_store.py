@@ -1,6 +1,5 @@
 import copy
 import logging
-import os
 import random
 
 import pytest
@@ -12,71 +11,14 @@ from tablestore_for_agent_memory.base.common import MetaType, Order
 from tablestore_for_agent_memory.base.base_memory_store import Message, Session
 from tablestore_for_agent_memory.base.filter import Filters
 from tablestore_for_agent_memory.memory.memory_store import MemoryStore
-from tablestore_for_agent_memory.util.ots import wait_search_index_ready
+from tablestore_for_agent_memory.util.tablestore_helper import TablestoreHelper
 
 fk_data = Faker(locale="zh_CN")
 logger = logging.getLogger(__name__)
 
 
-# noinspection DuplicatedCode
 @pytest.fixture
-def tablestore_client():
-    endpoint = os.getenv("tablestore_end_point")
-    instance_name = os.getenv("tablestore_instance_name")
-    access_key_id = os.getenv("tablestore_access_key_id")
-    access_key_secret = os.getenv("tablestore_access_key_secret")
-    if endpoint is None or instance_name is None or access_key_id is None or access_key_secret is None:
-        pytest.skip(
-            "endpoint is None or instance_name is None or " "access_key_id is None or access_key_secret is None"
-        )
-
-    return tablestore.OTSClient(
-        endpoint,
-        access_key_id,
-        access_key_secret,
-        instance_name,
-        retry_policy=tablestore.WriteRetryPolicy(),
-    )
-
-
-def random_session(user_id=fk_data.user_name()) -> Session:
-    session = Session(user_id=user_id, session_id=fk_data.uuid4())
-    session.metadata["title"] = random.choice(["abc", "def", "ghi", "abcd", "abcdef", "abcgh"])
-    session.metadata["meta_string"] = fk_data.name()
-    session.metadata["meta_long"] = random.randint(0, 9999999999999)
-    session.metadata["meta_double"] = random.uniform(0.0, 1.0)
-    session.metadata["meta_boolean"] = random.choice([True, False])
-    session.metadata["meta_bytes"] = bytearray(fk_data.name(), encoding="utf8")
-    return session
-
-
-def random_message(session_id=fk_data.user_name()) -> Message:
-    message = Message(session_id=session_id, message_id=fk_data.uuid4())
-    message.create_time = random.randint(0, 999999999)
-    message.content = " ".join(
-        random.choices(
-            ["abc", "def", "ghi", "abcd", "adef", "abcgh", "apple", "banana", "cherry"], k=random.randint(1, 10)
-        )
-    )
-    message.metadata["meta_string"] = fk_data.name_male()
-    message.metadata["meta_long"] = random.randint(0, 999999999)
-    message.metadata["meta_double"] = random.uniform(1.0, 2.0)
-    message.metadata["meta_boolean"] = random.choice([True, False])
-    message.metadata["meta_bytes"] = bytearray(fk_data.city_name(), encoding="utf8")
-    return message
-
-
-# noinspection DuplicatedCode
-@pytest.fixture
-def memory_store():
-    endpoint = os.getenv("tablestore_end_point")
-    instance_name = os.getenv("tablestore_instance_name")
-    access_key_id = os.getenv("tablestore_access_key_id")
-    access_key_secret = os.getenv("tablestore_access_key_secret")
-    if endpoint is None or instance_name is None or access_key_id is None or access_key_secret is None:
-        pytest.skip(
-            "endpoint is None or instance_name is None or " "access_key_id is None or access_key_secret is None"
-        )
+def memory_store(tablestore_client: tablestore.OTSClient):
 
     session_secondary_index_meta = {
         "meta_string": MetaType.STRING,
@@ -106,14 +48,6 @@ def memory_store():
         tablestore.FieldSchema("meta_boolean", tablestore.FieldType.BOOLEAN),
     ]
 
-    tablestore_client = tablestore.OTSClient(
-        endpoint,
-        access_key_id,
-        access_key_secret,
-        instance_name,
-        retry_policy=tablestore.WriteRetryPolicy(),
-    )
-
     memory_store = MemoryStore(
         tablestore_client=tablestore_client,
         session_secondary_index_meta=session_secondary_index_meta,
@@ -121,6 +55,33 @@ def memory_store():
         message_search_index_schema=message_search_index_schema,
     )
     return memory_store
+
+
+def random_session(user_id=fk_data.user_name()) -> Session:
+    session = Session(user_id=user_id, session_id=fk_data.uuid4())
+    session.metadata["title"] = random.choice(["abc", "def", "ghi", "abcd", "abcdef", "abcgh"])
+    session.metadata["meta_string"] = fk_data.name()
+    session.metadata["meta_long"] = random.randint(0, 9999999999999)
+    session.metadata["meta_double"] = random.uniform(0.0, 1.0)
+    session.metadata["meta_boolean"] = random.choice([True, False])
+    session.metadata["meta_bytes"] = bytearray(fk_data.name(), encoding="utf8")
+    return session
+
+
+def random_message(session_id=fk_data.user_name()) -> Message:
+    message = Message(session_id=session_id, message_id=fk_data.uuid4())
+    message.create_time = random.randint(0, 999999999)
+    message.content = " ".join(
+        random.choices(
+            ["abc", "def", "ghi", "abcd", "adef", "abcgh", "apple", "banana", "cherry"], k=random.randint(1, 10)
+        )
+    )
+    message.metadata["meta_string"] = fk_data.name_male()
+    message.metadata["meta_long"] = random.randint(0, 999999999)
+    message.metadata["meta_double"] = random.uniform(1.0, 2.0)
+    message.metadata["meta_boolean"] = random.choice([True, False])
+    message.metadata["meta_bytes"] = bytearray(fk_data.city_name(), encoding="utf8")
+    return message
 
 
 def test_memory_store_init(memory_store):
@@ -236,7 +197,7 @@ def test_get_sessions(memory_store, tablestore_client):
     user_id_meta_boolean_true_count = 0
     user_id_meta_double_gt_half_1_count = 0
     user_id_meta_double_gt_half_1_and_meta_bool_true_count = 0
-    total_count = random.randint(10, 100)
+    total_count = random.randint(10, 99)
     update_time_and_session_id = []
     for i in range(total_count):
         user_id = random.choice(["1", "2"])
@@ -368,7 +329,7 @@ def test_get_message(memory_store):
     session_id_meta_boolean_true_count = 0
     session_id_meta_double_gt_half_1_count = 0
     session_id_meta_double_gt_half_1_and_meta_bool_true_count = 0
-    total_count = random.randint(10, 100)
+    total_count = random.randint(10, 99)
     for i in range(total_count):
         session_id = random.choice(["1", "2"])
         message = random_message(session_id=session_id)
@@ -535,7 +496,7 @@ def test_session_search_index(memory_store):
     user_id_meta_boolean_true_count = 0
     user_id_meta_double_gt_half_1_count = 0
     user_id_meta_double_gt_half_1_and_meta_bool_true_count = 0
-    total_count = random.randint(50, 90)
+    total_count = random.randint(50, 99)
     for i in range(total_count):
         user_id = random.choice(["1", "2"])
         session = random_session(user_id=user_id)
@@ -551,7 +512,7 @@ def test_session_search_index(memory_store):
                 user_id_meta_double_gt_half_1_and_meta_bool_true_count += 1
     all_sessions = list(memory_store.list_all_sessions())
     assert len(all_sessions) == total_count
-    wait_search_index_ready(
+    TablestoreHelper.wait_search_index_ready(
         tablestore_client=memory_store._client,
         table_name=memory_store._session_table_name,
         index_name=memory_store._session_search_index_name,
@@ -641,7 +602,7 @@ def test_message_search_index(memory_store):
     session_id_meta_boolean_true_count = 0
     session_id_meta_double_gt_half_1_count = 0
     session_id_meta_double_gt_half_1_and_meta_bool_true_count = 0
-    total_count = random.randint(50, 100)
+    total_count = random.randint(50, 99)
     for i in range(total_count):
         session_id = random.choice(["1", "2"])
         message = random_message(session_id=session_id)
@@ -660,7 +621,7 @@ def test_message_search_index(memory_store):
 
     all_message = list(memory_store.get_all_messages())
     assert len(all_message) == total_count
-    wait_search_index_ready(
+    TablestoreHelper.wait_search_index_ready(
         tablestore_client=memory_store._client,
         table_name=memory_store._message_table_name,
         index_name=memory_store._message_search_index_name,

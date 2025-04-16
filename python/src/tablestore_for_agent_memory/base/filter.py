@@ -53,10 +53,10 @@ class BaseOperatorFilter(Filter):
     meta_key: Optional[str] = Field(default=None)
     meta_value: Optional[Union[int, float, bool, str]] = Field(default=None)
 
-    def __init__(self, meta_key: Optional[str]=None, meta_value: Optional[Union[int, float, bool, str]]=None):
+    def __init__(self, meta_key: Optional[str] = None, meta_value: Optional[Union[int, float, bool, str]] = None):
         super().__init__()
         self.meta_key = meta_key
-        self.meta_value = meta_value
+        self.meta_value = meta_value 
 
     def filter_type(self) -> FilterType:
         return FilterType.Operator
@@ -94,34 +94,54 @@ class GTE(BaseOperatorFilter):
 
 class LTE(BaseOperatorFilter):
 
-    def __init__(self, meta_key: str, meta_value:Union[int, float, bool, str]):
+    def __init__(self, meta_key: str, meta_value: Union[int, float, bool, str]):
         super().__init__(meta_key, meta_value)
+
 
 class All(BaseOperatorFilter):
     def __init__(self):
-        super().__init__(None,None)
+        super().__init__(None, None)
+
 
 class IN(BaseOperatorFilter):
+    meta_values:List[Union[int, float, bool, str]]=Field(default=None)
 
     def __init__(self, meta_key: str, meta_values: List[Union[int, float, bool, str]]):
         super().__init__(meta_key, None)
-        self.meta_values=meta_values
-        
+        self.meta_values = meta_values
+
+
 class NotIN(BaseOperatorFilter):
-
+    meta_values:List[Union[int, float, bool, str]]=Field(default=None)
+    
     def __init__(self, meta_key: str, meta_values: List[Union[int, float, bool, str]]):
         super().__init__(meta_key, None)
-        self.meta_values=meta_values
+        self.meta_values = meta_values
+
 
 class TextMatch(BaseOperatorFilter):
     def __init__(self, meta_key: str, meta_value: str):
         super().__init__(meta_key, meta_value)
-        
+
+
 class TextMatchPhrase(BaseOperatorFilter):
-    
+
     def __init__(self, meta_key: str, meta_value: str):
         super().__init__(meta_key, meta_value)
+
+
+class VectorQuery(BaseOperatorFilter):
     
+    query_vector: List[float] = Field(default=None)
+    top_k: Optional[int] = Field(default=10)
+    metadata_filter: Optional[Filter] = Field(default=None)
+    
+    def __init__(self, vector_field: str, query_vector: List[float], top_k: Optional[int] = 10, metadata_filter: Optional[Filter] = None):
+        super().__init__(vector_field, None)
+        self.query_vector = query_vector
+        self.top_k = top_k
+        self.metadata_filter = metadata_filter
+
 
 class Filters(ABC):
 
@@ -142,7 +162,7 @@ class Filters(ABC):
         return Eq(meta_key, meta_value)
 
     @staticmethod
-    def not_eq(meta_key: str, meta_value:Union[int, float, bool, str]) -> Filter:
+    def not_eq(meta_key: str, meta_value: Union[int, float, bool, str]) -> Filter:
         return NotEQ(meta_key, meta_value)
 
     @staticmethod
@@ -154,29 +174,38 @@ class Filters(ABC):
         return LT(meta_key, meta_value)
 
     @staticmethod
-    def gte(meta_key: str, meta_value:Union[int, float, bool, str]) -> Filter:
+    def gte(meta_key: str, meta_value: Union[int, float, bool, str]) -> Filter:
         return GTE(meta_key, meta_value)
 
     @staticmethod
-    def lte(meta_key: str, meta_value:Union[int, float, bool, str]) -> Filter:
+    def lte(meta_key: str, meta_value: Union[int, float, bool, str]) -> Filter:
         return LTE(meta_key, meta_value)
-    
+
     @staticmethod
-    def _in(meta_key: str, meta_values: List[Union[int, float, bool, str]]) -> Filter:
+    def In(meta_key: str, meta_values: List[Union[int, float, bool, str]]) -> Filter:
         return IN(meta_key, meta_values)
-    
+
     @staticmethod
     def not_in(meta_key: str, meta_values: List[Union[int, float, bool, str]]) -> Filter:
         return NotIN(meta_key, meta_values)
-    
+
     @staticmethod
-    def text_match(meta_key: str, meta_value:str) -> Filter:
+    def text_match(meta_key: str, meta_value: str) -> Filter:
         return TextMatch(meta_key, meta_value)
-    
+
     @staticmethod
-    def text_match_phrase(meta_key: str, meta_value:str) -> Filter:
+    def vector_query(vector_field: str, query_vector: List[float], top_k: Optional[int] = 10, metadata_filter: Optional[Filter] = None) -> Filter:
+        return VectorQuery(
+            vector_field=vector_field,
+            query_vector=query_vector,
+            top_k=top_k,
+            metadata_filter=metadata_filter,
+        )
+
+    @staticmethod
+    def text_match_phrase(meta_key: str, meta_value: str) -> Filter:
         return TextMatchPhrase(meta_key, meta_value)
-    
+
     @staticmethod
     def all() -> Filter:
         return All()

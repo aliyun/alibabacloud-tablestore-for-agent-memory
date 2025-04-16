@@ -1,35 +1,62 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterator, List, Optional, Union
+from typing import Dict, Iterator, List, Optional, Union
 
 from pydantic import BaseModel, Field, validate_call
 
-from tablestore_for_agent_memory.base.common import MetaType, Order, microseconds_timestamp
+from tablestore_for_agent_memory.base.common import Order, microseconds_timestamp
 from tablestore_for_agent_memory.base.filter import Filter
 
 
 @dataclass
 class Session(ABC):
     user_id: str
+    """
+    用户id
+    """
 
     session_id: str
+    """
+    会话id
+    """
 
     update_time: int = microseconds_timestamp()
+    """
+    会话更新时间。每次写入Message消息需要更新该表。
+    """
 
     metadata: Optional[Dict[str, Union[int, float, str, bool, bytearray]]] = field(default_factory=dict)
+    """
+    会话元数据
+    """
 
 
 @dataclass
 class Message(ABC):
     session_id: str
+    """
+    会话id。
+    """
 
     message_id: str
+    """
+    消息id。会话id和消息id组合起来唯一确认一行数据。
+    """
 
     create_time: Optional[int] = field(default=None)
+    """
+    消息创建时间。消息创建好后，该时间不可修改。
+    """
 
     content: Optional[str] = field(default=None)
+    """
+    消息内容
+    """
 
     metadata: Optional[Dict[str, Union[int, float, str, bool, bytearray]]] = field(default_factory=dict)
+    """
+    消息元数据
+    """
 
 
 class BaseMemoryStore(BaseModel, ABC):
@@ -135,7 +162,7 @@ class BaseMemoryStore(BaseModel, ABC):
         :param max_count: Iterator中最大的个数。
         """
         pass
-    
+
     @abstractmethod
     @validate_call
     def list_recent_sessions_paginated(
@@ -150,7 +177,6 @@ class BaseMemoryStore(BaseModel, ABC):
     ) -> (List[Session], Optional[str]):
         """
         使用连续翻页方式，列出最近的所有会话信息，根据Session会话更新时间排序。
-        :rtype: (Session信息, 下一次访问的token)
         :param user_id: 用户id，必传参数。
         :param page_size: 返回的Session会话个数
         :param next_token: 下次翻页的token
@@ -158,14 +184,15 @@ class BaseMemoryStore(BaseModel, ABC):
         :param inclusive_end_update_time: 结束时间.
         :param metadata_filter: metadata过滤条件。
         :param batch_size: 内部批量获取参数。
+        :rtype: (会话列表, 下一次访问的token)
         """
         pass
 
     @validate_call
     @abstractmethod
-    def search_sessions(self, 
-                        metadata_filter:  Optional[Filter]=None,
-                        limit: Optional[int] = Field(default=100, le=100, ge=1), 
+    def search_sessions(self,
+                        metadata_filter: Optional[Filter] = None,
+                        limit: Optional[int] = Field(default=100, le=100, ge=1),
                         next_token: Optional[str] = None
                         ) -> (List[Session], Optional[str]):
         """
@@ -173,6 +200,7 @@ class BaseMemoryStore(BaseModel, ABC):
         :param metadata_filter: metadata过滤条件。
         :param limit: 单次返回行数.
         :param next_token: 下次翻页的token
+        :rtype: (会话列表, 下一次访问的token)
         """
         pass
 
@@ -260,7 +288,7 @@ class BaseMemoryStore(BaseModel, ABC):
     @validate_call
     @abstractmethod
     def search_messages(self,
-                        metadata_filter: Optional[Filter] = None, 
+                        metadata_filter: Optional[Filter] = None,
                         limit: Optional[int] = Field(default=100, le=100, ge=1),
                         next_token: Optional[str] = None
                         ) -> (List[Message], Optional[str]):
@@ -269,5 +297,6 @@ class BaseMemoryStore(BaseModel, ABC):
         :param metadata_filter: metadata过滤条件。
         :param limit: 单次返回行数.
         :param next_token: 下次翻页的token
+        :rtype: (消息列表, 下一次访问的token)
         """
         pass

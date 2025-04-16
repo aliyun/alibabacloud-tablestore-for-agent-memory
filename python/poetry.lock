@@ -718,19 +718,6 @@ files = [
 ]
 
 [[package]]
-name = "enum34"
-version = "1.1.10"
-description = "Python 3.4 Enum backported to 3.3, 3.2, 3.1, 2.7, 2.6, 2.5, and 2.4"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "enum34-1.1.10-py2-none-any.whl", hash = "sha256:a98a201d6de3f2ab3db284e70a33b0f896fbf35f8086594e8c9e74b909058d53"},
-    {file = "enum34-1.1.10-py3-none-any.whl", hash = "sha256:c3858660960c984d6ab0ebad691265180da2b43f07e061c0f8dca9ef3cffd328"},
-    {file = "enum34-1.1.10.tar.gz", hash = "sha256:cce6a7477ed816bd2542d03d53db9f0db935dd013b70f336a95c73979289f248"},
-]
-
-[[package]]
 name = "exceptiongroup"
 version = "1.2.2"
 description = "Backport of PEP 654 (exception groups)"
@@ -2639,19 +2626,19 @@ tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
 
 [[package]]
 name = "tablestore"
-version = "6.1.0"
+version = "6.2.0"
 description = "Aliyun TableStore(OTS) SDK"
 optional = false
-python-versions = "*"
+python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "tablestore-6.1.0.tar.gz", hash = "sha256:bfe6a3e0fe88a230729723c357f4a46b8869a06a4b936db20692ed587a721c1c"},
+    {file = "tablestore-6.2.0-py3-none-any.whl", hash = "sha256:6af496d841ab1ff3f78b46abbd87b95a08d89605c51664d2b30933b1d1c5583a"},
+    {file = "tablestore-6.2.0.tar.gz", hash = "sha256:0773e77c00542be1bfebbc3c7a85f72a881c63e4e7df7c5a9793a54144590e68"},
 ]
 
 [package.dependencies]
 certifi = ">=2016.2.28"
 crc32c = ">=2.7.1"
-enum34 = ">=1.1.6"
 flatbuffers = ">=22.9.24"
 future = ">=0.16.0"
 numpy = ">=1.11.0"
@@ -2953,4 +2940,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "14e2f26d61214c786f4068535c4ecba070fe228c137449e816786bd73f679424"
+content-hash = "529710bb4cb896a9d043e2f2a106b09cce41a590023ba2021e1dfe5395eb709c"
