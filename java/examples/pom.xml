@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>com.aliyun.openservices.tablestore</groupId>
+		<artifactId>tablestore-for-agent-memory-parent</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
+
+	<artifactId>tablestore-for-agent-memory-examples</artifactId>
+
+	<properties>
+		<maven.compiler.source>17</maven.compiler.source>
+		<maven.compiler.target>17</maven.compiler.target>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<ai.djl.version>0.32.0</ai.djl.version>
+	</properties>
+
+	<dependencies>
+		<!--suppress VulnerableLibrariesLocal -->
+		<dependency>
+			<groupId>com.aliyun.openservices.tablestore</groupId>
+			<artifactId>tablestore-for-agent-memory</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.aliyun.openservices.tablestore</groupId>
+			<artifactId>tablestore-for-agent-memory-spring-ai</artifactId>
+			<version>${project.version}</version>
+			<exclusions>
+				<!--	为了使用log4j，排除了Spring的部分日志依赖，请根据自己代码的log代码自行选择 -->
+				<exclusion>
+					<groupId>org.apache.logging.log4j</groupId>
+					<artifactId>log4j-to-slf4j</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<!--  开始：运行 Embedding 模型依赖   -->
+		<dependency>
+			<groupId>ai.djl</groupId>
+			<artifactId>api</artifactId>
+			<version>${ai.djl.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>ai.djl.huggingface</groupId>
+			<artifactId>tokenizers</artifactId>
+			<version>${ai.djl.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>ai.djl</groupId>
+			<artifactId>model-zoo</artifactId>
+			<version>${ai.djl.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>ai.djl.pytorch</groupId>
+			<artifactId>pytorch-engine</artifactId>
+			<version>${ai.djl.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>ai.djl.onnxruntime</groupId>
+			<artifactId>onnxruntime-engine</artifactId>
+			<version>${ai.djl.version}</version>
+		</dependency>
+		<!--  结束：运行 Embedding 模型依赖   -->
+
+	</dependencies>
+
+</project>

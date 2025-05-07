@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.aliyun.openservices.tablestore</groupId>
+	<artifactId>tablestore-for-agent-memory-parent</artifactId>
+	<version>${revision}</version>
+	<packaging>pom</packaging>
+
+	<name>tablestore-for-agent-memory-parent</name>
+	<description>tablestore for agent memory</description>
+	<url>https://www.aliyun.com/product/ots</url>
+
+	<licenses>
+		<license>
+			<name>Apache-2.0</name>
+			<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+			<comments>A business-friendly OSS license</comments>
+		</license>
+	</licenses>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<revision>0.1.0-SNAPSHOT</revision>
+	</properties>
+
+	<modules>
+		<module>core</module>
+		<module>spring-ai</module>
+		<module>examples</module>
+	</modules>
+
+	<distributionManagement>
+		<snapshotRepository>
+			<id>snapshots</id>
+			<url>http://mvnrepo.alibaba-inc.com/mvn/snapshots</url>
+		</snapshotRepository>
+	</distributionManagement>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>1.18.38</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<!--       以下为测试依赖     -->
+		<dependency>
+			<groupId>org.reflections</groupId>
+			<artifactId>reflections</artifactId>
+			<version>0.9.12</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<version>5.11.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>net.datafaker</groupId>
+			<artifactId>datafaker</artifactId>
+			<version>1.9.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-core</artifactId>
+			<version>2.17.1</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-slf4j2-impl</artifactId>
+			<version>2.24.3</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.lmax</groupId>
+			<artifactId>disruptor</artifactId>
+			<version>3.4.4</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>flatten-maven-plugin</artifactId>
+				<version>1.7.0</version>
+				<configuration>
+					<updatePomFile>true</updatePomFile>
+					<flattenMode>resolveCiFriendliesOnly</flattenMode>
+				</configuration>
+				<executions>
+					<execution>
+						<id>flatten</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>flatten</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>flatten.clean</id>
+						<phase>clean</phase>
+						<goals>
+							<goal>clean</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>com.diffplug.spotless</groupId>
+				<artifactId>spotless-maven-plugin</artifactId>
+				<version>2.44.4</version>
+				<configuration>
+					<formats>
+						<format>
+							<!-- define the files to apply to -->
+							<includes>
+								<include>pom.xml</include>
+								<include>*.md</include>
+								<include>*.properties</include>
+								<include>*.json</include>
+								<include>Makefile</include>
+								<include>.gitignore</include>
+							</includes>
+							<trimTrailingWhitespace/>
+							<endWithNewline/>
+							<indent>
+								<tabs>true</tabs>
+								<spacesPerTab>4</spacesPerTab>
+							</indent>
+						</format>
+					</formats>
+					<java>
+						<importOrder/>
+						<removeUnusedImports/>
+						<formatAnnotations/>
+						<eclipse>
+							<version>4.19.0</version>
+							<file>./eclipse-formatter.xml</file> <!-- optional -->
+						</eclipse>
+					</java>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>
