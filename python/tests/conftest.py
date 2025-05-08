@@ -43,7 +43,17 @@ class MockEmbedding:
         return "MockEmbedding"
 
     def _get_vector(self) -> List[float]:
-        return [random.uniform(0.1, 1)] * self.embed_dimension
+        vecs: List[float] = []
+        for _ in range(self.embed_dimension):
+            vecs.append(random.uniform(0.1, 1))
+        return vecs
 
     def embedding(self, query: str) -> List[float]:
         return self._get_vector()
+
+
+def test_mock_embedding():
+    embedding_model = MockEmbedding(4)
+    vector = embedding_model.embedding("abc")
+    assert len(vector) == 4
+    print(vector)
