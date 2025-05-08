@@ -1,0 +1,37 @@
+name: upload to py
+traits:
+  - name: "notification"
+    properties:
+      types:
+        - "dingtalk"
+      when: "fail"
+      callbacks: [ ]
+      users: [ ]
+      webhooks: [ ]
+params:
+  is_test:
+    name: testpypi
+    description: 是否上传到测试仓库 testpypi
+    type: boolean
+    default: true
+  is_prod:
+    name: pypi【高危】
+    description: 【高危】是否上传到正式仓库
+    type: boolean
+    default: false
+jobs:
+  upload:
+    image: "alios-8u"
+    timeout: 15m
+    envs:
+      is_test: ${{params.is_test}}
+      is_prod: ${{params.is_prod}}
+      test_token: ${{secrets.test_token}}
+      prod_token: ${{secrets.prod_token}}
+    steps:
+      - uses: checkout
+      - uses: setup-env
+        inputs:
+          python-version: "3.9"
+      - run:
+          - sh .aoneci/publish_pypi.sh
