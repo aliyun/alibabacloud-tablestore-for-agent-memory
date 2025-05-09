@@ -162,6 +162,7 @@
 							<!-- define the files to apply to -->
 							<includes>
 								<include>pom.xml</include>
+								<include>*.xml</include>
 								<include>*.md</include>
 								<include>*.properties</include>
 								<include>*.json</include>
