@@ -12,25 +12,6 @@
 	<description>tablestore for agent memory</description>
 	<url>https://www.aliyun.com/product/ots</url>
 
-	<licenses>
-		<license>
-			<name>Apache-2.0</name>
-			<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
-			<distribution>repo</distribution>
-			<comments>A business-friendly OSS license</comments>
-		</license>
-	</licenses>
-
-	<scm>
-		<connection>
-			scm:git:https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory.git
-		</connection>
-		<developerConnection>
-			scm:git:https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory.git
-		</developerConnection>
-		<url>https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory</url>
-	</scm>
-
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<revision>1.0.0</revision>
@@ -56,16 +37,6 @@
 		</profile>
 	</profiles>
 
-	<distributionManagement>
-		<snapshotRepository>
-			<id>snapshots</id>
-			<url>http://mvnrepo.alibaba-inc.com/mvn/snapshots</url>
-		</snapshotRepository>
-		<repository>
-			<id>sonatype-nexus-staging</id>
-			<url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-		</repository>
-	</distributionManagement>
 
 	<dependencies>
 		<dependency>
@@ -212,4 +183,44 @@
 			</plugin>
 		</plugins>
 	</build>
+
+
+	<distributionManagement>
+		<snapshotRepository>
+			<id>snapshots</id>
+			<url>http://mvnrepo.alibaba-inc.com/mvn/snapshots</url>
+		</snapshotRepository>
+		<repository>
+			<id>sonatype-nexus-staging</id>
+			<url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+		</repository>
+	</distributionManagement>
+
+	<developers>
+		<developer>
+			<id>xunjian.sl</id>
+			<name>xunjian.sl</name>
+			<email>xunjian.sl@alibaba-inc.com</email>
+		</developer>
+	</developers>
+
+	<scm>
+		<connection>
+			scm:git:https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory.git
+		</connection>
+		<developerConnection>
+			scm:git:https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory.git
+		</developerConnection>
+		<url>https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory</url>
+	</scm>
+
+
+	<licenses>
+		<license>
+			<name>Apache-2.0</name>
+			<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+			<comments>A business-friendly OSS license</comments>
+		</license>
+	</licenses>
 </project>
