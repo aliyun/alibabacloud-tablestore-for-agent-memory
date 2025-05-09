@@ -10,7 +10,7 @@ lint:
 	./mvnw clean spotless:check
 
 build:
-	./mvnw clean package -DskipTests
+	./mvnw clean source:jar javadoc:jar package -DskipTests
 
 deploy:
 	./mvnw clean package deploy -DskipTests  -Dgpg.skip -Pinclude-spring-ai
