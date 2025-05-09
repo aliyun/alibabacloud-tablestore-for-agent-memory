@@ -13,7 +13,7 @@ build:
 	./mvnw clean package -DskipTests
 
 deploy:
-	./mvnw clean package deploy -DskipTests  -Dgpg.skip
+	./mvnw clean package deploy -DskipTests  -Dgpg.skip -Pinclude-spring-ai
 
 test:	## Run tests via pytest.
 	./mvnw test
