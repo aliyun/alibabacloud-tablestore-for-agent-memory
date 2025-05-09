@@ -123,7 +123,7 @@
 						<executions>
 							<execution>
 								<id>print-file-content</id>
-								<phase>deploy</phase> <!-- 绑定到 deploy 生命周期 -->
+								<phase>prepare-package</phase> <!-- 绑定到 deploy 生命周期 -->
 								<goals>
 									<goal>run</goal>
 								</goals>
