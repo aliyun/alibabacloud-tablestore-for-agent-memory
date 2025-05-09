@@ -21,6 +21,16 @@
 		</license>
 	</licenses>
 
+	<scm>
+		<connection>
+			scm:git:https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory.git
+		</connection>
+		<developerConnection>
+			scm:git:https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory.git
+		</developerConnection>
+		<url>https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory</url>
+	</scm>
+
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<revision>1.0.0-SNAPSHOT</revision>
@@ -37,6 +47,10 @@
 			<id>snapshots</id>
 			<url>http://mvnrepo.alibaba-inc.com/mvn/snapshots</url>
 		</snapshotRepository>
+		<repository>
+			<id>sonatype-nexus-staging</id>
+			<url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+		</repository>
 	</distributionManagement>
 
 	<dependencies>
@@ -88,6 +102,31 @@
 
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.sonatype.plugins</groupId>
+				<artifactId>nexus-staging-maven-plugin</artifactId>
+				<version>1.6.3</version>
+				<extensions>true</extensions>
+				<configuration>
+					<serverId>sonatype-nexus-staging</serverId>
+					<nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+					<autoReleaseAfterClose>true</autoReleaseAfterClose>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>3.2.1</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>sign</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>flatten-maven-plugin</artifactId>
