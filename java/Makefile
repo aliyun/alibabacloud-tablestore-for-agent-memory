@@ -13,7 +13,7 @@ build:
 	./mvnw clean package -DskipTests
 
 deploy:
-	./mvnw clean package deploy -DskipTests
+	./mvnw clean package deploy -DskipTests  -Dgpg.skip
 
 test:	## Run tests via pytest.
 	./mvnw test
