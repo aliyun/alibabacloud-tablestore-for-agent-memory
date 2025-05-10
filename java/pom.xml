@@ -20,15 +20,15 @@
 	<profiles>
 		<profile>
 			<id>exclude-spring-ai</id>
-			<activation>
-				<activeByDefault>true</activeByDefault>
-			</activation>
 			<modules>
 				<module>core</module>
 			</modules>
 		</profile>
 		<profile>
 			<id>include-spring-ai</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
 			<modules>
 				<module>core</module>
 				<module>spring-ai</module>
@@ -102,6 +102,7 @@
 				<version>1.6.8</version>
 				<extensions>true</extensions>
 				<configuration>
+					<autoReleaseAfterClose>true</autoReleaseAfterClose>
 					<serverId>sonatype-nexus-staging</serverId>
 					<nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
 				</configuration>
