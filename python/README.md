@@ -1,13 +1,22 @@
 # Tablestore for Agent Memory (Python 实现)
 
+## 安装
+
+``` shell
+  pip install tablestore-for-agent-memory
+```
+
+> pypi 仓库链接请参考：[tablestore-for-agent-memory](https://pypi.org/project/tablestore-for-agent-memory/)
+
+
 ## 文档 
 
 - Memory Store
   - 用户与大模型交互的session会话管理和聊天消息记录 
-  - [入门指南 notebook 链接](docs/memory_store_tutorial.ipynb)
+  - [入门指南 notebook 链接](https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory/blob/main/python/docs/memory_store_tutorial.ipynb)
 - Knowledge Store
   - 知识库文档管理，相似性搜索。
-  - [入门指南 notebook 链接](docs/knowledge_store_tutorial.ipynb)
+  - [入门指南 notebook 链接](https://github.com/aliyun/alibabacloud-tablestore-for-agent-memory/blob/main/python/docs/knowledge_store_tutorial.ipynb)
 
 
 ## 依赖
