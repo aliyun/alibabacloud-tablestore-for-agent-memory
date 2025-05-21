@@ -1,5 +1,17 @@
 # Tablestore for Agent Memory (Java 实现)
 
+## 安装
+
+最新版本请 [点击链接查看Maven仓库](https://central.sonatype.com/artifact/com.aliyun.openservices.tablestore/tablestore-for-agent-memory)
+
+```xml
+<dependency>
+	<groupId>com.aliyun.openservices.tablestore</groupId>
+	<artifactId>tablestore-for-agent-memory</artifactId>
+	<version>最新版本</version>
+</dependency>
+```
+
 ## 文档
 
 - Memory Store
@@ -15,6 +27,14 @@
 		- [Knowledge Store 初始化](examples/src/main/java/com/aliyun/openservices/tablestore/agent/knowledge/KnowledgeStoreInitExample.java)
 		- [知识库管理和向量检索](examples/src/main/java/com/aliyun/openservices/tablestore/agent/knowledge/KnowledgeExample.java)
 	- Spring AI Vector Store 兼容版
+		-  安装, 最新版本请 [点击链接查看Maven仓库](https://central.sonatype.com/artifact/com.aliyun.openservices.tablestore/tablestore-for-agent-memory-spring-ai)：
+		```
+		<dependency>
+			<groupId>com.aliyun.openservices.tablestore</groupId>
+			<artifactId>tablestore-for-agent-memory-spring-ai</artifactId>
+			<version>最新版本</version>
+		</dependency>
+		```
 		- 基于 `Knowledge Store` 兼容 `Spring AI Vector Store`.
 		- [TablestoreVectorStore 使用文档](examples/src/main/java/com/aliyun/openservices/tablestore/agent/spring/TablestoreVectorStoreExample.java)
 
