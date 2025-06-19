@@ -301,7 +301,7 @@ class KnowledgeStore(BaseKnowledgeStore):
             self._search_index_schema
         )
         self._search_index_schema = TablestoreHelper.add_schema(
-            tablestore.FieldSchema(self._text_field, tablestore.FieldType.TEXT, analyzer=tablestore.AnalyzerType.MINWORD),
+            tablestore.FieldSchema(self._text_field, tablestore.FieldType.TEXT, analyzer=tablestore.AnalyzerType.MAXWORD),
             self._search_index_schema
         )
         routing_fields = []
