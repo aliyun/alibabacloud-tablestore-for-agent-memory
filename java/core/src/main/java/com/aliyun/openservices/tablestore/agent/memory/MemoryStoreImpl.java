@@ -606,7 +606,9 @@ public class MemoryStoreImpl implements MemoryStore {
                 throw Exceptions.illegalArgument("order is required when inclusiveStartCreateTime or inclusiveEndCreateTime is specified");
             }
         } else {
-            order = Order.DESC;
+            if (order == null) {
+                order = Order.DESC;
+            }
         }
         if (inclusiveStartCreateTime != null && inclusiveEndCreateTime != null) {
             if (Order.DESC.equals(order) && inclusiveStartCreateTime < inclusiveEndCreateTime) {

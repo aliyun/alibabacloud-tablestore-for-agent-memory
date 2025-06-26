@@ -583,4 +583,37 @@ class MemoryStoreTest extends BaseTest {
             Assertions.assertEquals(total, messages.size());
         }
     }
+
+    @Test
+    void batchListMessage() {
+        store.deleteTableAndIndex();
+        store.initTable();
+        store.initSearchIndex();
+        store.deleteAllMessages();
+        Assertions.assertEquals(0, CollectionUtil.toList(store.listAllMessages()).size());
+
+        String session = "1";
+        int totalMessage = ThreadLocalRandom.current().nextInt(1, 10);
+        for (int i = 0; i < totalMessage; i++) {
+            Message message = new Message(session, UUID.randomUUID().toString());
+            message.setContent("idx:" + i);
+            store.putMessage(message);
+        }
+        {
+            List<Message> messages = CollectionUtil.toList(store.listMessages(session));
+            log.info("messages:{}", messages);
+            for (int i = 0; i < messages.size(); i++) {
+                Message message = messages.get(i);
+                Assertions.assertEquals("idx:" + i, message.getContent());
+            }
+        }
+        {
+            List<Message> messages = CollectionUtil.toList(store.listMessages(session, null, null, null, Order.DESC, null, null));
+            log.info("messages:{}", messages);
+            for (int i = 0, j = messages.size() - 1; i < messages.size(); i++, j--) {
+                Message message = messages.get(j);
+                Assertions.assertEquals("idx:" + i, message.getContent());
+            }
+        }
+    }
 }

@@ -14,31 +14,13 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<revision>1.0.0-SNAPSHOT</revision>
+		<revision>1.1.0-SNAPSHOT</revision>
 	</properties>
 
-	<profiles>
-		<profile>
-			<id>exclude-spring-ai</id>
-			<activation>
-				<activeByDefault>true</activeByDefault>
-			</activation>
-			<modules>
-				<module>core</module>
-			</modules>
-		</profile>
-		<profile>
-			<id>include-spring-ai</id>
-			<activation>
-				<activeByDefault>false</activeByDefault>
-			</activation>
-			<modules>
-				<module>core</module>
-				<module>spring-ai</module>
-				<module>examples</module>
-			</modules>
-		</profile>
-	</profiles>
+	<modules>
+		<module>core</module>
+		<module>examples</module>
+	</modules>
 
 	<dependencies>
 		<dependency>

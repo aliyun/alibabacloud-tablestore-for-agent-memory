@@ -26,24 +26,11 @@
 	- 使用文档:
 		- [Knowledge Store 初始化](examples/src/main/java/com/aliyun/openservices/tablestore/agent/knowledge/KnowledgeStoreInitExample.java)
 		- [知识库管理和向量检索](examples/src/main/java/com/aliyun/openservices/tablestore/agent/knowledge/KnowledgeExample.java)
-	- Spring AI Vector Store 兼容版
-		-  安装, 最新版本请 [点击链接查看Maven仓库](https://central.sonatype.com/artifact/com.aliyun.openservices.tablestore/tablestore-for-agent-memory-spring-ai)：
-		```
-		<dependency>
-			<groupId>com.aliyun.openservices.tablestore</groupId>
-			<artifactId>tablestore-for-agent-memory-spring-ai</artifactId>
-			<version>最新版本</version>
-		</dependency>
-		```
-		- 基于 `Knowledge Store` 兼容 `Spring AI Vector Store`.
-		- [TablestoreVectorStore 使用文档](examples/src/main/java/com/aliyun/openservices/tablestore/agent/spring/TablestoreVectorStoreExample.java)
-
 ## 开发
 
 #### 依赖
 
-- JDK 17 及以上.
-	- 开发此仓库代码依赖的版本，发布到 maven 仓库后核心模块是兼容 JDK8 的，但是 SpringAI 仅支持 JDK17 的)
+- JDK 8 及以上.
 
 #### 代码格式化
 
