@@ -388,7 +388,8 @@ class MemoryStore(BaseMemoryStore):
             if order is None:
                 raise ValueError(f"order is required when inclusive_start_create_time or inclusive_end_create_time is specified")
         else:
-            order = Order.DESC
+            if order is None:
+                order = Order.DESC
         if order == order.ASC:
             const_min = tablestore.INF_MIN
             const_max = tablestore.INF_MAX
@@ -440,7 +441,8 @@ class MemoryStore(BaseMemoryStore):
             if order is None:
                 raise ValueError(f"order is required when inclusive_start_create_time or inclusive_end_create_time is specified")
         else:
-            order = Order.DESC
+            if order is None:
+                order = Order.DESC
         if order == order.ASC:
             const_min = tablestore.INF_MIN
             const_max = tablestore.INF_MAX
