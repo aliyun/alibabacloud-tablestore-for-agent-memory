@@ -10,6 +10,8 @@ import com.aliyun.openservices.tablestore.agent.model.sort.Order;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -18,17 +20,15 @@ public class KnowledgeExample {
     public void example(KnowledgeStoreImpl store) throws Exception {
 
         /*
-         * 创建一个Embedding模型供后续使用。 这里以本地比较火的 Embedding 模型 “BAAI/bge-base-zh-v1.5”为例, 维度768，使用djl可直接本地基于cpu跑起来。
-         * 模型细节：https://modelscope.cn/models/BAAI/bge-base-zh-v1.5
+         * 创建一个Embedding模型供后续使用。维度768。
          */
-        String modelName = "ai.djl.huggingface.rust/BAAI/bge-base-zh-v1.5/0.0.1/bge-base-zh-v1.5";
-        EmbeddingService embeddingService = new EmbeddingService(modelName); // 进程结束可以将其close
+        FakedEmbeddingService fakedEmbeddingService = new FakedEmbeddingService(768);
 
         // 创建一个 document
         String tenantId = "user_小明"; // 如果不涉及多租户场景，后续其它地方的tenantId相关参数不传即可。如果涉及多租户，该租户id填什么值由各个业务自己决定，通常来说使用用户id或者知识库id当做租户id有通用性。
         Document document = new Document("文档id_a", tenantId);
         document.setText("你好，世界");
-        float[] embedding = embeddingService.embed(document.getText());
+        float[] embedding = fakedEmbeddingService.embed(document.getText());
         document.setEmbedding(embedding);
         document.getMetadata().put("meta_example_string", "abc");
         document.getMetadata().put("meta_example_text", "abc");
@@ -54,17 +54,17 @@ public class KnowledgeExample {
         // 删除一个租户下所有 document
         store.deleteDocumentByTenant(tenantId);
         // 删除一个租户下满足条件的 document, 条件：city=="shanghai" && year >= 2005
-        store.deleteDocument(Set.of(tenantId), Filters.and(Filters.eq("city", "shanghai"), Filters.gte("year", 2005)));
+        store.deleteDocument(new HashSet<>(Collections.singletonList(tenantId)), Filters.and(Filters.eq("city", "shanghai"), Filters.gte("year", 2005)));
 
         // 查询："你好" 相关的文档
         String queryText = "你好";
-        Set<String> tenantIds = Set.of(tenantId); // 多租户场景下租户id。如果不涉及多租户场景，则传null或空集合即可
+        Set<String> tenantIds = new HashSet<>(Collections.singletonList(tenantId)); // 多租户场景下租户id。如果不涉及多租户场景，则传null或空集合即可
         Filter metadataFilter1 = null; // 过滤条件.
         Filter metadataFilter2 = Filters.and(Filters.eq("city", "shanghai"), Filters.gte("year", 2005)); // 过滤条件. city=="shanghai" && year >= 2005
         {
             // 1. 使用 向量检索 document
             {
-                float[] queryVector = embeddingService.embed(queryText);
+                float[] queryVector = fakedEmbeddingService.embed(queryText);
                 int topK = 20;
                 Float minScore = 0.0f; // 0.0f或者null表示不限制
 

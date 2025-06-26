@@ -1,7 +1,7 @@
 package com.aliyun.openservices.tablestore.agent.filter;
 
 import com.aliyun.openservices.tablestore.agent.model.filter.Filters;
-import java.util.List;
+import java.util.Arrays;
 
 public class FilterExample {
 
@@ -13,7 +13,7 @@ public class FilterExample {
         {
             Filters.eq("city", "shanghai");
             Filters.gte("year", 2005);
-            Filters.in("city", List.of("beijing", "hangzhou", "shanghai"));
+            Filters.in("city", Arrays.asList("beijing", "hangzhou", "shanghai"));
 
             // 全文检索
             Filters.textMatch("content", "hello world");
