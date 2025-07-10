@@ -467,7 +467,7 @@ def test_get_message(memory_store):
             break
     assert messages_paginated == messages
 
-    messages = list(memory_store.list_messages(session_id="1"))
+    messages = list(memory_store.list_messages(session_id="1", order=Order.ASC))
     messages_paginated = []
     token = None
     while True:
