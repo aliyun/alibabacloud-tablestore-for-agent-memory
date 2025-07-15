@@ -1,11 +1,11 @@
 # Tablestore for Agent Memory
 
-## 实现
+## 源码、文档、示例代码
 
 - [Python 实现](./python/README.md)
 - [Java 实现](./java/README.md)
 
-## 介绍
+## 相关文章
 
 - [表格存储：为 AI 注入“记忆”，构建大规模、高性能、低成本的 Agent Memory 数据底座](https://developer.aliyun.com/article/1662854)
 - [基于 Tablestore 的 Agent Memory 框架](https://developer.aliyun.com/article/1671587)
