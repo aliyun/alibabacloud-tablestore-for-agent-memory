@@ -253,7 +253,8 @@ class TablestoreHelper:
                 raise ValueError(f"Unsupported filter condition: {metadata_filter}")
         elif isinstance(metadata_filter, BaseOperatorFilter):
             return parse_operator_filter_function(metadata_filter)
-    
+        return None
+
     @staticmethod
     def parse_table_filter(
             filter_item: BaseOperatorFilter,
@@ -335,7 +336,8 @@ class TablestoreHelper:
                 raise ValueError(f"Unsupported filter condition: {metadata_filter}")
         elif isinstance(metadata_filter, BaseOperatorFilter):
             return parse_operator_filter_function(metadata_filter)
-    
+        return None
+
     @staticmethod
     def parse_search_index_filter(
             filter_item: BaseOperatorFilter,
@@ -480,10 +482,16 @@ class TablestoreHelper:
             try:
                 result = tablestore_client.batch_write_row(request)
                 _, failed_rows = result.get_delete()
+                err_msgs = []
                 for f in failed_rows:
-                    logger.info(f"delete row failed, error code:{f.error_code}, error msg:{f.error_message}, delete row detail: {batch_delete_row_list[f.index]}")
+                    msg = f"delete row failed, error code:{f.error_code}, error msg:{f.error_message}, delete row detail: {batch_delete_row_list[f.index]}"
+                    err_msgs.append(msg)
+                    logger.info(msg)
+                if len(err_msgs) != 0:
+                    raise ValueError(f"delete rows failed: {err_msgs}")
             except BaseException as ex:
                 logger.info(f"delete rows failed: {ex}, delete rows detail: {batch_delete_row_list}")
+                raise ex
     
         for item in iterator:
             if isinstance(item, Message):

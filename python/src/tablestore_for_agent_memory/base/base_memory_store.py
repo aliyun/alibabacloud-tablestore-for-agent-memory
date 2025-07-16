@@ -298,7 +298,7 @@ class BaseMemoryStore(BaseModel, ABC):
             order: Optional[Order] = None,
             metadata_filter: Optional[Filter] = None,
             batch_size: Optional[int] = Field(default=None, le=5000, ge=1),
-    ) -> Response[Session]:
+    ) -> Response[Message]:
         """
         List all messages using continuous pagination. Filtering can be done based on parameters.
         :param session_id: Session ID
