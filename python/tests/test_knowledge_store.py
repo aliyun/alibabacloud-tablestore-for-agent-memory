@@ -8,16 +8,25 @@ from faker import Faker
 
 from tablestore_for_agent_memory.base.base_knowledge_store import Document
 from tablestore_for_agent_memory.base.filter import Filters
+from tablestore_for_agent_memory.knowledge.async_knowledge_store import (
+    AsyncKnowledgeStore,
+)
 from tablestore_for_agent_memory.knowledge.knowledge_store import KnowledgeStore
 from tablestore_for_agent_memory.util.tablestore_helper import TablestoreHelper
-from tests.conftest import MockEmbedding
+
+from .conftest import MockEmbedding, RandomClientRunner
 
 fk_data = Faker(locale="zh_CN")
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def single_knowledge_store(tablestore_client: tablestore.OTSClient, embedding_model: MockEmbedding):
+def single_knowledge_store(
+    tablestore_client: tablestore.OTSClient,
+    async_tablestore_client: tablestore.AsyncOTSClient,
+    embedding_model: MockEmbedding,
+    run_mode,
+):
     search_index_schema = [
         tablestore.FieldSchema("user_id", tablestore.FieldType.KEYWORD),
         tablestore.FieldSchema("meta_string", tablestore.FieldType.KEYWORD),
@@ -27,18 +36,35 @@ def single_knowledge_store(tablestore_client: tablestore.OTSClient, embedding_mo
     ]
     logger.info(f"vector_dimension:{embedding_model.embed_dimension}")
 
-    knowledge_store = KnowledgeStore(
-        tablestore_client=tablestore_client,
-        vector_dimension=embedding_model.embed_dimension,
-        table_name="single_knowledge_store",
-        enable_multi_tenant=False,
-        search_index_schema=search_index_schema,
+    knowledge_store = RandomClientRunner(
+        sync_client_class=KnowledgeStore,
+        async_client_class=AsyncKnowledgeStore,
+        sync_client_kwargs=dict(
+            tablestore_client=tablestore_client,
+            vector_dimension=embedding_model.embed_dimension,
+            table_name="single_knowledge_store",
+            enable_multi_tenant=False,
+            search_index_schema=search_index_schema,
+        ),
+        async_client_kwargs=dict(
+            tablestore_client=async_tablestore_client,
+            vector_dimension=embedding_model.embed_dimension,
+            table_name="single_knowledge_store",
+            enable_multi_tenant=False,
+            search_index_schema=search_index_schema,
+        ),
+        run_mode=run_mode,
     )
     return knowledge_store
 
 
 @pytest.fixture
-def multi_tenant_knowledge_store(tablestore_client: tablestore.OTSClient, embedding_model: MockEmbedding):
+def multi_tenant_knowledge_store(
+    tablestore_client: tablestore.OTSClient,
+    async_tablestore_client: tablestore.AsyncOTSClient,
+    embedding_model: MockEmbedding,
+    run_mode,
+):
     search_index_schema = [
         tablestore.FieldSchema("user_id", tablestore.FieldType.KEYWORD),
         tablestore.FieldSchema("meta_string", tablestore.FieldType.KEYWORD),
@@ -48,12 +74,24 @@ def multi_tenant_knowledge_store(tablestore_client: tablestore.OTSClient, embedd
     ]
     logger.info(f"vector_dimension:{embedding_model.embed_dimension}")
 
-    knowledge_store = KnowledgeStore(
-        tablestore_client=tablestore_client,
-        vector_dimension=embedding_model.embed_dimension,
-        table_name="multi_tenant_knowledge_store",
-        enable_multi_tenant=True,
-        search_index_schema=search_index_schema,
+    knowledge_store = RandomClientRunner(
+        sync_client_class=KnowledgeStore,
+        async_client_class=AsyncKnowledgeStore,
+        sync_client_kwargs=dict(
+            tablestore_client=tablestore_client,
+            vector_dimension=embedding_model.embed_dimension,
+            table_name="multi_tenant_knowledge_store",
+            enable_multi_tenant=True,
+            search_index_schema=search_index_schema,
+        ),
+        async_client_kwargs=dict(
+            tablestore_client=async_tablestore_client,
+            vector_dimension=embedding_model.embed_dimension,
+            table_name="multi_tenant_knowledge_store",
+            enable_multi_tenant=True,
+            search_index_schema=search_index_schema,
+        ),
+        run_mode=run_mode,
     )
     return knowledge_store
 

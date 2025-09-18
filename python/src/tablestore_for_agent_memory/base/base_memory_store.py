@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Dict, Iterator, List, Optional, Union, Any
 
+import tablestore
 from pydantic import BaseModel, Field, validate_call
 
-from tablestore_for_agent_memory.base.common import Order, microseconds_timestamp, Response
+from tablestore_for_agent_memory.base.common import Order, microseconds_timestamp, Response, MetaType
 from tablestore_for_agent_memory.base.filter import Filter
 
 
@@ -60,6 +61,33 @@ class Message(ABC):
 
 
 class BaseMemoryStore(BaseModel, ABC):
+
+    def __init__(
+            self,
+            tablestore_client: Union[tablestore.OTSClient, tablestore.AsyncOTSClient],
+            session_table_name: Optional[str] = "session",
+            session_secondary_index_name: Optional[str] = "session_secondary_index",
+            session_secondary_index_meta: Optional[Dict[str, MetaType]] = None,
+            session_search_index_name: Optional[str] = "session_search_index_name",
+            session_search_index_schema: Optional[List[tablestore.FieldSchema]] = None,
+            message_table_name: Optional[str] = "message",
+            message_secondary_index_name: Optional[str] = "message_secondary_index",
+            message_search_index_name: Optional[str] = "message_search_index",
+            message_search_index_schema: Optional[List[tablestore.FieldSchema]] = None,
+            **kwargs: Any,
+    ):
+        super().__init__()
+        self._session_table_name = session_table_name
+        self._session_secondary_index_name = session_secondary_index_name
+        self._session_secondary_index_meta = session_secondary_index_meta if session_secondary_index_meta else {}
+        self._session_secondary_index_meta["update_time"] = MetaType.INTEGER
+        self._session_search_index_name = session_search_index_name
+        self._session_search_index_schema = session_search_index_schema
+        self._message_table_name = message_table_name
+        self._message_secondary_index_name = message_secondary_index_name
+        self._message_search_index_name = message_search_index_name
+        self._message_search_index_schema = message_search_index_schema
+        self._client = tablestore_client
 
     @abstractmethod
     def put_session(self, session: Session) -> None:

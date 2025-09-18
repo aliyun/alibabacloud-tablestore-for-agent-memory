@@ -10,15 +10,18 @@ from tablestore_for_agent_memory.base.common import MetaType, Order
 
 from tablestore_for_agent_memory.base.base_memory_store import Message, Session
 from tablestore_for_agent_memory.base.filter import Filters
+from tablestore_for_agent_memory.memory.async_memory_store import AsyncMemoryStore
 from tablestore_for_agent_memory.memory.memory_store import MemoryStore
 from tablestore_for_agent_memory.util.tablestore_helper import TablestoreHelper
+
+from .conftest import RandomClientRunner
 
 fk_data = Faker(locale="zh_CN")
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def memory_store(tablestore_client: tablestore.OTSClient):
+def memory_store(tablestore_client: tablestore.OTSClient, async_tablestore_client: tablestore.AsyncOTSClient, run_mode):
     session_secondary_index_meta = {
         "meta_string": MetaType.STRING,
         "meta_long": MetaType.INTEGER,
@@ -47,11 +50,22 @@ def memory_store(tablestore_client: tablestore.OTSClient):
         tablestore.FieldSchema("meta_boolean", tablestore.FieldType.BOOLEAN),
     ]
 
-    memory_store = MemoryStore(
-        tablestore_client=tablestore_client,
-        session_secondary_index_meta=session_secondary_index_meta,
-        session_search_index_schema=session_search_index_schema,
-        message_search_index_schema=message_search_index_schema,
+    memory_store = RandomClientRunner(
+        sync_client_class=MemoryStore,
+        async_client_class=AsyncMemoryStore,
+        sync_client_kwargs=dict(
+            tablestore_client=tablestore_client,
+            session_secondary_index_meta=session_secondary_index_meta,
+            session_search_index_schema=session_search_index_schema,
+            message_search_index_schema=message_search_index_schema,
+        ),
+        async_client_kwargs=dict(
+            tablestore_client=async_tablestore_client,
+            session_secondary_index_meta=session_secondary_index_meta,
+            session_search_index_schema=session_search_index_schema,
+            message_search_index_schema=message_search_index_schema,
+        ),
+        run_mode=run_mode,
     )
     return memory_store
 

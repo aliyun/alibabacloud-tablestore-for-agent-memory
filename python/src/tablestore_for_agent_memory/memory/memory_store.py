@@ -36,18 +36,19 @@ class MemoryStore(BaseMemoryStore):
             message_search_index_schema: Optional[List[tablestore.FieldSchema]] = None,
             **kwargs: Any,
     ):
-        super().__init__()
-        self._session_table_name = session_table_name
-        self._session_secondary_index_name = session_secondary_index_name
-        self._session_secondary_index_meta = session_secondary_index_meta
-        self._session_secondary_index_meta["update_time"] = MetaType.INTEGER
-        self._session_search_index_name = session_search_index_name
-        self._session_search_index_schema = session_search_index_schema
-        self._message_table_name = message_table_name
-        self._message_secondary_index_name = message_secondary_index_name
-        self._message_search_index_name = message_search_index_name
-        self._message_search_index_schema = message_search_index_schema
-        self._client = tablestore_client
+        super().__init__(
+            tablestore_client=tablestore_client,
+            session_table_name=session_table_name,
+            session_secondary_index_name=session_secondary_index_name,
+            session_secondary_index_meta=session_secondary_index_meta,
+            session_search_index_name=session_search_index_name,
+            session_search_index_schema=session_search_index_schema,
+            message_table_name=message_table_name,
+            message_secondary_index_name=message_secondary_index_name,
+            message_search_index_name=message_search_index_name,
+            message_search_index_schema=message_search_index_schema,
+            **kwargs
+        )
 
     def init_table(self) -> None:
         """

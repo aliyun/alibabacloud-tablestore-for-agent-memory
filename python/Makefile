@@ -14,4 +14,6 @@ lint:
 	poetry run black **/*.py --check --diff
 	poetry run black **/*.ipynb --check --diff
 test:	## Run tests via pytest.
-	pytest tests
+	pytest tests --run_mode="sync"
+	pytest tests --run_mode="async"
+	pytest tests --run_mode="mixed"

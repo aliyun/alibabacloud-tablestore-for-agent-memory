@@ -5,6 +5,7 @@ from dataclasses import field
 from typing import Dict, Iterator, List, Union, Any
 from typing import Optional
 
+import tablestore
 from pydantic import BaseModel, Field, validate_call
 
 from tablestore_for_agent_memory.base.common import Response
@@ -64,6 +65,37 @@ class DocumentHit(ABC):
 
 
 class BaseKnowledgeStore(BaseModel, ABC):
+
+    def __init__(
+            self,
+            tablestore_client: Union[tablestore.OTSClient, tablestore.AsyncOTSClient],
+            vector_dimension: int,
+            enable_multi_tenant: Optional[bool] = False,
+            table_name: Optional[str] = "knowledge",
+            search_index_name: Optional[str] = "knowledge_search_index_name",
+            search_index_schema: Optional[List[tablestore.FieldSchema]] = None,
+            text_field: Optional[str] = "text",
+            embedding_field: Optional[str] = "embedding",
+            vector_metric_type: tablestore.VectorMetricType = tablestore.VectorMetricType.VM_COSINE,
+            **kwargs: Any,
+    ):
+        super().__init__()
+        self._client = tablestore_client
+        self._vector_dimension = vector_dimension
+        self._enable_multi_tenant = enable_multi_tenant
+        self._vector_metric_type = vector_metric_type
+        self._table_name = table_name
+        self._search_index_name = search_index_name
+        self._search_index_schema = search_index_schema
+        self._text_field = text_field
+        self._embedding_field = embedding_field
+        default_meta_data_to_get = ["document_id", "tenant_id", text_field]
+        if search_index_schema:
+            for schema in search_index_schema:
+                # By default, vectors are not returned
+                if schema.field_type is not tablestore.FieldType.VECTOR:
+                    default_meta_data_to_get.append(schema.field_name)
+        self._default_meta_data_to_get = default_meta_data_to_get
 
     @abstractmethod
     def put_document(self, document: Document) -> None:

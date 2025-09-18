@@ -32,22 +32,18 @@ class KnowledgeStore(BaseKnowledgeStore):
             vector_metric_type: tablestore.VectorMetricType = tablestore.VectorMetricType.VM_COSINE,
             **kwargs: Any,
     ):
-        super().__init__()
-        self._client = tablestore_client
-        self._vector_dimension = vector_dimension
-        self._enable_multi_tenant = enable_multi_tenant
-        self._vector_metric_type = vector_metric_type
-        self._table_name = table_name
-        self._search_index_name = search_index_name
-        self._search_index_schema = search_index_schema
-        self._text_field = text_field
-        self._embedding_field = embedding_field
-        default_meta_data_to_get = ["document_id", "tenant_id", text_field]
-        for schema in search_index_schema:
-            # By default, vectors are not returned
-            if schema.field_type is not tablestore.FieldType.VECTOR:
-                default_meta_data_to_get.append(schema.field_name)
-        self._default_meta_data_to_get = default_meta_data_to_get
+        super().__init__(
+            tablestore_client=tablestore_client,
+            vector_dimension=vector_dimension,
+            enable_multi_tenant=enable_multi_tenant,
+            table_name=table_name,
+            search_index_name=search_index_name,
+            search_index_schema=search_index_schema,
+            text_field=text_field,
+            embedding_field=embedding_field,
+            vector_metric_type=vector_metric_type,
+            **kwargs
+        )
 
     def init_table(self) -> None:
         """

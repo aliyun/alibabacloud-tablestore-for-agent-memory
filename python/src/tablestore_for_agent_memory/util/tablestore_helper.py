@@ -3,7 +3,7 @@ import json
 import logging
 import math
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, AsyncIterator
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import six
@@ -60,6 +60,29 @@ class TablestoreHelper:
             raise e
 
     @staticmethod
+    async def async_create_table(
+            tablestore_client: tablestore.AsyncOTSClient,
+            table_name: str,
+            schema_of_primary_key: List[Tuple[str, MetaType]],
+            defined_columns: List[Tuple[str, MetaType]] = None,
+    ) -> None:
+        table_names = await tablestore_client.list_table()
+        if table_name in table_names:
+            logger.warning(f"tablestore table:[{table_name}] already exists")
+            return
+        schema_of_primary_key = [(t[0], t[1].value) for t in schema_of_primary_key]
+        defined_columns = [] if defined_columns is None else [(t[0], t[1].value) for t in defined_columns]
+        table_meta = tablestore.TableMeta(table_name, schema_of_primary_key, defined_columns)
+        table_options = tablestore.TableOptions()
+        reserved_throughput = tablestore.ReservedThroughput(tablestore.CapacityUnit(0, 0))
+        try:
+            await tablestore_client.create_table(table_meta, table_options, reserved_throughput)
+            logger.info("Tablestore create table[%s] successfully.", table_name)
+        except Exception as e:
+            logger.exception("Tablestore create table[%s] failed", table_name)
+            raise e
+
+    @staticmethod
     def create_secondary_index(
             tablestore_client: tablestore.OTSClient,
             table_name: str,
@@ -76,6 +99,28 @@ class TablestoreHelper:
         include_base_data = False
         try:
             tablestore_client.create_secondary_index(table_name, index_meta, include_base_data)
+            logger.info("Tablestore create secondary_index[%s] successfully.", secondary_index_name)
+        except Exception as e:
+            logger.exception("Tablestore create secondary_index[%s] failed", secondary_index_name)
+            raise e
+
+    @staticmethod
+    async def async_create_secondary_index(
+            tablestore_client: tablestore.AsyncOTSClient,
+            table_name: str,
+            secondary_index_name: str,
+            primary_key_names: List[str],
+            defined_column_names: List[str],
+            index_type=SecondaryIndexType.LOCAL_INDEX,
+    ) -> None:
+        describe_table_response = await tablestore_client.describe_table(table_name)
+        if secondary_index_name in [index.index_name for index in describe_table_response.secondary_indexes]:
+            logger.warning(f"tablestore secondary index:[{secondary_index_name}] already exists")
+            return
+        index_meta = SecondaryIndexMeta(secondary_index_name, primary_key_names, defined_column_names, index_type)
+        include_base_data = False
+        try:
+            await tablestore_client.create_secondary_index(table_name, index_meta, include_base_data)
             logger.info("Tablestore create secondary_index[%s] successfully.", secondary_index_name)
         except Exception as e:
             logger.exception("Tablestore create secondary_index[%s] failed", secondary_index_name)
@@ -102,6 +147,34 @@ class TablestoreHelper:
     
         try:
             tablestore_client.delete_table(table_name)
+            logger.info("Tablestore delete table[%s] successfully.", table_name)
+        except tablestore.OTSServiceError as e:
+            if e.get_error_code() == "OTSObjectNotExist" and "does not exist" in e.get_error_message():
+                logger.exception("delete table[%s] failed, which is not exist", table_name)
+            else:
+                raise e
+
+    @staticmethod
+    async def async_delete_table(
+            tablestore_client: tablestore.AsyncOTSClient,
+            table_name: str,
+    ) -> None:
+        """Delete table if exists."""
+        try:
+            search_index_list = await tablestore_client.list_search_index(table_name=table_name)
+            for resp_tuple in search_index_list:
+                await tablestore_client.delete_search_index(resp_tuple[0], resp_tuple[1])
+                logger.info("Tablestore delete search index[%s] successfully.", resp_tuple[1])
+        except tablestore.OTSServiceError as e:
+            if (
+                    e.get_error_code() == "OTSParameterInvalid" or e.get_error_code() == "OTSObjectNotExist"
+            ) and "does not exist" in e.get_error_message():
+                logger.exception("delete table[%s] failed, which is not exist", table_name)
+            else:
+                raise e
+
+        try:
+            await tablestore_client.delete_table(table_name)
             logger.info("Tablestore delete table[%s] successfully.", table_name)
         except tablestore.OTSServiceError as e:
             if e.get_error_code() == "OTSObjectNotExist" and "does not exist" in e.get_error_message():
@@ -467,6 +540,75 @@ class TablestoreHelper:
                 return self.row_list[0]
             else:
                 return self.inclusive_start_primary_key
+
+    @staticmethod
+    async def aiter(items):
+        for item in items:
+            yield item
+
+    class AsyncGetRangeIterator(AsyncIterator):
+        def __init__(
+                self,
+                tablestore_client: tablestore.AsyncOTSClient,
+                table_name: str,
+                translate_function: Callable[[Optional[tablestore.Row]], Optional[Any]],
+                inclusive_start_primary_key: List[Tuple],
+                exclusive_end_primary_key: List[Tuple],
+                metadata_filter: Optional[Filter] = None,
+                order: Order = Order.DESC,
+                batch_size: Optional[int] = None,
+                max_count: Optional[int] = None,
+        ):
+            self.tablestore_client = tablestore_client
+            self.table_name = table_name
+            self.translate_function = translate_function
+            self.condition = TablestoreHelper.paser_table_filters(metadata_filter=metadata_filter)
+            self.order = order
+            self.inclusive_start_primary_key = inclusive_start_primary_key
+            self.exclusive_end_primary_key = exclusive_end_primary_key
+            self.batch_size = batch_size
+            self.row_list = None
+            self.count = 0
+            self.max_count = max_count
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self) -> Any:
+            if self.max_count is not None and 0 < self.max_count <= self.count:
+                raise StopAsyncIteration
+            if not self.row_list and self._has_next_batch():
+                await self._fetch_next_batch()
+
+            if not self.row_list:
+                raise StopAsyncIteration
+
+            item = self.row_list.pop(0)
+            self.count += 1
+            return self.translate_function(item)
+
+        async def _fetch_next_batch(self) -> None:
+            _, next_start_primary_key, row_list, _ = await self.tablestore_client.get_range(
+                table_name=self.table_name,
+                direction=self.order.value,
+                inclusive_start_primary_key=self.inclusive_start_primary_key,
+                exclusive_end_primary_key=self.exclusive_end_primary_key,
+                columns_to_get=None,
+                limit=self.batch_size,
+                column_filter=self.condition,
+                max_version=1,
+            )
+            self.row_list = row_list
+            self.inclusive_start_primary_key = next_start_primary_key
+
+        def _has_next_batch(self):
+            return self.inclusive_start_primary_key is not None
+
+        async def next_start_primary_key(self):
+            if len(self.row_list) > 0:
+                return self.row_list[0]
+            else:
+                return self.inclusive_start_primary_key
     
     @staticmethod
     def batch_delete(
@@ -520,6 +662,59 @@ class TablestoreHelper:
                 delete_fun()
         if len(batch_delete_row_list) != 0:
             delete_fun()
+
+    @staticmethod
+    async def async_batch_delete(
+            tablestore_client: tablestore.AsyncOTSClient,
+            table_name: str,
+            iterator: AsyncIterator[Union[Message, Session, Document]]
+    ) -> None:
+        batch_delete_row_list = []
+
+        async def delete_fun():
+            request = tablestore.BatchWriteRowRequest()
+            request.add(tablestore.TableInBatchWriteRowItem(table_name, batch_delete_row_list))
+            try:
+                result = await tablestore_client.batch_write_row(request)
+                _, failed_rows = result.get_delete()
+                err_msgs = []
+                for f in failed_rows:
+                    msg = f"delete row failed, error code:{f.error_code}, error msg:{f.error_message}, delete row detail: {batch_delete_row_list[f.index]}"
+                    err_msgs.append(msg)
+                    logger.info(msg)
+                if len(err_msgs) != 0:
+                    raise ValueError(f"delete rows failed: {err_msgs}")
+            except BaseException as ex:
+                logger.info(f"delete rows failed: {ex}, delete rows detail: {batch_delete_row_list}")
+                raise ex
+
+        async for item in iterator:
+            if isinstance(item, Message):
+                primary_key = [
+                    ("session_id", item.session_id),
+                    ("create_time", item.create_time),
+                    ("message_id", item.message_id),
+                ]
+            elif isinstance(item, Session):
+                primary_key = [
+                    ("user_id", item.user_id),
+                    ("session_id", item.session_id),
+                ]
+            elif isinstance(item, Document):
+                primary_key = [
+                    ("document_id", item.document_id),
+                    ("tenant_id", item.tenant_id),
+                ]
+            else:
+                raise ValueError(f"Unsupported delete item type: {type(item)}")
+            row = tablestore.Row(primary_key)
+            condition = tablestore.Condition(tablestore.RowExistenceExpectation.IGNORE)
+            delete_row_item = tablestore.DeleteRowItem(row, condition)
+            batch_delete_row_list.append(delete_row_item)
+            if len(batch_delete_row_list) == 200:
+                await delete_fun()
+        if len(batch_delete_row_list) != 0:
+            await delete_fun()
     
     @staticmethod
     def encode_next_primary_key_token(next_primary_key: List[Tuple]) -> str:
@@ -562,6 +757,29 @@ class TablestoreHelper:
             return
         index_meta = tablestore.SearchIndexMeta(index_schemas, index_setting=index_setting)
         tablestore_client.create_search_index(
+            table_name, index_name, index_meta
+        )
+        logger.info(f"tablestore create search index[{index_name}] successfully.")
+
+    @staticmethod
+    async def async_create_search_index_if_not_exist(
+            tablestore_client: tablestore.AsyncOTSClient,
+            table_name: str,
+            index_name: str,
+            index_schemas: List[tablestore.FieldSchema],
+            routing_fields: Optional[List[str]] = None,
+    ):
+        if routing_fields is None:
+            routing_fields = []
+        index_setting = IndexSetting(routing_fields=routing_fields)
+        search_index_list = await tablestore_client.list_search_index(
+            table_name=table_name
+        )
+        if index_name in [t[1] for t in search_index_list]:
+            logger.warning(f"tablestore search index[{index_name}] already exists")
+            return
+        index_meta = tablestore.SearchIndexMeta(index_schemas, index_setting=index_setting)
+        await tablestore_client.create_search_index(
             table_name, index_name, index_meta
         )
         logger.info(f"tablestore create search index[{index_name}] successfully.")
@@ -661,6 +879,30 @@ class TablestoreHelper:
         start_time = time.time()
         while max_wait_time > 0:
             search_response = tablestore_client.search(
+                table_name=table_name,
+                index_name=index_name,
+                search_query=tablestore.SearchQuery(tablestore.MatchAllQuery(), limit=0, get_total_count=True),
+                columns_to_get=tablestore.ColumnsToGet(return_type=tablestore.ColumnReturnType.NONE),
+            )
+            if search_response.total_count == total_count:
+                print(f'table:[{table_name}] search index:[{index_name}] ready! use time:{time.time() - start_time}')
+                return
+            time.sleep(interval_time)
+            max_wait_time = max_wait_time - interval_time
+        assert False, f'table:[{table_name}] search index:[{index_name}] is not ready!! use time:{time.time() - start_time}'
+
+    @staticmethod
+    async def async_wait_search_index_ready(
+        tablestore_client: tablestore.AsyncOTSClient,
+        table_name: str,
+        index_name: str,
+        total_count: int
+    ) -> None:
+        max_wait_time = 300
+        interval_time = 1
+        start_time = time.time()
+        while max_wait_time > 0:
+            search_response = await tablestore_client.search(
                 table_name=table_name,
                 index_name=index_name,
                 search_query=tablestore.SearchQuery(tablestore.MatchAllQuery(), limit=0, get_total_count=True),
