@@ -537,7 +537,7 @@ class TablestoreHelper:
     
         def next_start_primary_key(self):
             if len(self.row_list) > 0:
-                return self.row_list[0]
+                return self.row_list[0].primary_key
             else:
                 return self.inclusive_start_primary_key
 
@@ -606,7 +606,7 @@ class TablestoreHelper:
 
         async def next_start_primary_key(self):
             if len(self.row_list) > 0:
-                return self.row_list[0]
+                return self.row_list[0].primary_key
             else:
                 return self.inclusive_start_primary_key
     

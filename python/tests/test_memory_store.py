@@ -8,7 +8,11 @@ from faker import Faker
 from pydantic import ValidationError
 from tablestore_for_agent_memory.base.common import MetaType, Order
 
-from tablestore_for_agent_memory.base.base_memory_store import Message, Session
+from tablestore_for_agent_memory.base.base_memory_store import (
+    BaseMemoryStore,
+    Message,
+    Session,
+)
 from tablestore_for_agent_memory.base.filter import Filters
 from tablestore_for_agent_memory.memory.async_memory_store import AsyncMemoryStore
 from tablestore_for_agent_memory.memory.memory_store import MemoryStore
@@ -202,7 +206,7 @@ def test_memory_store_message(memory_store):
     assert message_read_after_delete is None
 
 
-def test_get_sessions(memory_store, tablestore_client):
+def test_get_sessions(memory_store: BaseMemoryStore, tablestore_client):
     assert memory_store is not None
     memory_store._delete_table()
     memory_store.init_table()
@@ -335,7 +339,7 @@ def test_get_sessions(memory_store, tablestore_client):
     assert len(all_sessions) == 0
 
 
-def test_get_message(memory_store):
+def test_get_message(memory_store: BaseMemoryStore):
     assert memory_store is not None
     memory_store._delete_table()
     memory_store.init_table()
@@ -485,7 +489,9 @@ def test_get_message(memory_store):
     messages_paginated = []
     token = None
     while True:
-        response = memory_store.list_messages_paginated(session_id="1", page_size=3, next_token=token, order=Order.ASC)
+        response = memory_store.list_messages_paginated(
+            session_id="1", page_size=3, next_token=token, order=Order.ASC, batch_size=10
+        )
         sub_message, token = (response.hits, response.next_token)
         messages_paginated.extend(sub_message)
         if token is None:
