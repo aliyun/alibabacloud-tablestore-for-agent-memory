@@ -26,6 +26,12 @@ notebook = "^7.3.3"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
+addopts ="-s --capture=tee-sys"
+log_cli = "true"
+log_cli_level = "INFO"
 
 [build-system]
 requires = ["poetry-core"]
@@ -38,3 +44,8 @@ target-version = ['py39']
 [tool.isort]
 profile = "black"
 known_third_party = ["tablestore_for_agent_memory.base.common"]
+
+[[tool.poetry.source]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+priority = "primary"
