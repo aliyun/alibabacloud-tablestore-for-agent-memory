@@ -1,6 +1,7 @@
 import copy
 import logging
 import random
+from time import sleep
 
 import pytest
 import tablestore
@@ -786,3 +787,10 @@ def test_message_search_index(memory_store):
     assert all(
         session.session_id == "1" for session in messages
     ), f"Not all elements assert true, detail is:{[session.session_id for session in messages]}"
+
+
+def test_session_update_time_not_constant():
+    s1 = Session(user_id="1", session_id=fk_data.uuid4())
+    sleep(2)
+    s2 = Session(user_id="2", session_id=fk_data.uuid4())
+    assert s1.update_time != s2.update_time

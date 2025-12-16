@@ -21,7 +21,7 @@ class Session(ABC):
     Session id
     """
 
-    update_time: int = microseconds_timestamp()
+    update_time: Optional[int] = field(default_factory=microseconds_timestamp)
     """
     Update time of the session. This needs to be updated each time a Message is written.
     """
